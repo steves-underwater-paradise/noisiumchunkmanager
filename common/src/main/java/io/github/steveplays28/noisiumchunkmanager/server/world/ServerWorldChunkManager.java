@@ -452,6 +452,9 @@ public class ServerWorldChunkManager {
 		protoChunk.setStatus(ChunkStatus.LIGHT);
 		serverLightingProvider.light(protoChunk, protoChunk.isLightOn());
 
+		protoChunk.setStatus(ChunkStatus.SPAWN);
+		chunkGenerator.populateEntities(chunkRegion);
+
 		protoChunk.setStatus(ChunkStatus.FULL);
 		pointOfInterestStorage.saveChunk(chunkPos);
 		versionedChunkStorage.setNbt(chunkPos, ChunkSerializer.serialize(serverWorld, protoChunk));
