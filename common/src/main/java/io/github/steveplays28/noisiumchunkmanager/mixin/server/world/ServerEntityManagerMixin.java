@@ -1,5 +1,6 @@
 package io.github.steveplays28.noisiumchunkmanager.mixin.server.world;
 
+import io.github.steveplays28.noisiumchunkmanager.server.world.entity.event.ServerEntityEvent;
 import net.minecraft.entity.Entity;
 import net.minecraft.server.world.ServerEntityManager;
 import net.minecraft.world.entity.EntityLike;
@@ -8,7 +9,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import io.github.steveplays28.noisiumchunkmanager.experimental.server.world.entity.event.ServerEntityEvent;
 
 @Mixin(value = ServerEntityManager.class, priority = 500)
 public class ServerEntityManagerMixin<T extends EntityLike> {

@@ -68,13 +68,13 @@ public abstract class ServerWorldMixin implements ServerWorldExtension {
 	/**
 	 * Keeps a reference to this {@link ServerWorld}'s {@link ServerWorldEntityTracker}, to make sure it doesn't get garbage collected until the object is no longer necessary.
 	 */
-	@SuppressWarnings({"unused", "FieldCanBeLocal"})
+	@SuppressWarnings("unused")
 	@Unique
 	private ServerWorldEntityTracker noisiumchunkmanager$serverWorldEntityManager;
 	/**
 	 * Keeps a reference to this {@link ServerWorld}'s {@link ServerWorldPlayerChunkLoader}, to make sure it doesn't get garbage collected until the object is no longer necessary.
 	 */
-	@SuppressWarnings({"unused", "FieldCanBeLocal"})
+	@SuppressWarnings("unused")
 	@Unique
 	private ServerWorldPlayerChunkLoader noisiumchunkmanager$serverWorldPlayerChunkLoader;
 

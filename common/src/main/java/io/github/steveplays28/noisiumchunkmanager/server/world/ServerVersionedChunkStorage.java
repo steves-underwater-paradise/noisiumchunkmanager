@@ -1,4 +1,4 @@
-package io.github.steveplays28.noisiumchunkmanager.experimental.server.world;
+package io.github.steveplays28.noisiumchunkmanager.server.world;
 
 import com.mojang.datafixers.DataFixer;
 import net.minecraft.world.storage.VersionedChunkStorage;

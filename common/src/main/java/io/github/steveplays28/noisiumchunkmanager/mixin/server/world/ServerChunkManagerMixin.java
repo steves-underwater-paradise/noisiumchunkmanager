@@ -1,7 +1,11 @@
 package io.github.steveplays28.noisiumchunkmanager.mixin.server.world;
 
 import com.mojang.datafixers.DataFixer;
-import io.github.steveplays28.noisiumchunkmanager.experimental.util.world.chunk.networking.packet.PacketUtil;
+import io.github.steveplays28.noisiumchunkmanager.extension.world.server.ServerWorldExtension;
+import io.github.steveplays28.noisiumchunkmanager.server.world.ServerWorldChunkManager;
+import io.github.steveplays28.noisiumchunkmanager.server.world.chunk.event.ServerChunkEvent;
+import io.github.steveplays28.noisiumchunkmanager.server.world.event.ServerTickEvent;
+import io.github.steveplays28.noisiumchunkmanager.util.world.chunk.networking.packet.PacketUtil;
 import net.minecraft.entity.Entity;
 import net.minecraft.network.packet.Packet;
 import net.minecraft.network.packet.s2c.play.BlockUpdateS2CPacket;
@@ -40,7 +44,7 @@ import java.util.function.Supplier;
 
 /**
  * {@link Mixin} into {@link ServerChunkManager}.
- * This {@link Mixin} redirects all method calls from the {@link ServerWorld}'s {@link ServerChunkManager} to the {@link ServerWorld}'s {@link io.github.steveplays28.noisiumchunkmanager.experimental.server.world.ServerWorldChunkManager}.
+ * This {@link Mixin} redirects all method calls from the {@link ServerWorld}'s {@link ServerChunkManager} to the {@link ServerWorld}'s {@link ServerWorldChunkManager}.
  */
 @Mixin(ServerChunkManager.class)
 public abstract class ServerChunkManagerMixin {
@@ -80,7 +84,7 @@ public abstract class ServerChunkManagerMixin {
 
 	@Inject(method = "tick(Ljava/util/function/BooleanSupplier;Z)V", at = @At(value = "HEAD"), cancellable = true)
 	private void noisiumchunkmanager$stopServerChunkManagerFromTicking(@NotNull BooleanSupplier shouldKeepTicking, boolean tickChunks, @NotNull CallbackInfo ci) {
-		io.github.steveplays28.noisiumchunkmanager.experimental.server.world.event.ServerTickEvent.SERVER_ENTITY_MOVEMENT_TICK.invoker().onServerEntityMovementTick();
+		ServerTickEvent.SERVER_ENTITY_MOVEMENT_TICK.invoker().onServerEntityMovementTick();
 		ci.cancel();
 	}
 
@@ -92,7 +96,7 @@ public abstract class ServerChunkManagerMixin {
 	// TODO: Fix infinite loop
 	@Inject(method = "getChunk(IILnet/minecraft/world/chunk/ChunkStatus;Z)Lnet/minecraft/world/chunk/Chunk;", at = @At(value = "HEAD"), cancellable = true)
 	private void noisiumchunkmanager$getChunkFromNoisiumServerWorldChunkManager(int chunkX, int chunkZ, ChunkStatus leastStatus, boolean create, CallbackInfoReturnable<Chunk> cir) {
-		var noisiumServerWorldChunkManager = ((io.github.steveplays28.noisiumchunkmanager.experimental.extension.world.server.ServerWorldExtension) this.getWorld()).noisiumchunkmanager$getServerWorldChunkManager();
+		var noisiumServerWorldChunkManager = ((ServerWorldExtension) this.getWorld()).noisiumchunkmanager$getServerWorldChunkManager();
 		var chunkPosition = new ChunkPos(chunkX, chunkZ);
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
 			cir.setReturnValue(noisiumServerWorldChunkManager.getIoWorldChunk(chunkPosition));
@@ -104,7 +108,7 @@ public abstract class ServerChunkManagerMixin {
 
 	@Inject(method = "getChunk(II)Lnet/minecraft/world/chunk/light/LightSourceView;", at = @At(value = "HEAD"), cancellable = true)
 	private void noisiumchunkmanager$getChunkFromNoisiumServerWorldChunkManager(int chunkX, int chunkZ, CallbackInfoReturnable<WorldChunk> cir) {
-		var noisiumServerWorldChunkManager = ((io.github.steveplays28.noisiumchunkmanager.experimental.extension.world.server.ServerWorldExtension) this.getWorld()).noisiumchunkmanager$getServerWorldChunkManager();
+		var noisiumServerWorldChunkManager = ((ServerWorldExtension) this.getWorld()).noisiumchunkmanager$getServerWorldChunkManager();
 		var chunkPosition = new ChunkPos(chunkX, chunkZ);
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
 			cir.setReturnValue(noisiumServerWorldChunkManager.getIoWorldChunk(chunkPosition));
@@ -116,7 +120,7 @@ public abstract class ServerChunkManagerMixin {
 
 	@Inject(method = "getWorldChunk", at = @At(value = "HEAD"), cancellable = true)
 	private void noisiumchunkmanager$getWorldChunkFromNoisiumServerWorldChunkManager(int chunkX, int chunkZ, CallbackInfoReturnable<WorldChunk> cir) {
-		var noisiumServerWorldChunkManager = ((io.github.steveplays28.noisiumchunkmanager.experimental.extension.world.server.ServerWorldExtension) this.getWorld()).noisiumchunkmanager$getServerWorldChunkManager();
+		var noisiumServerWorldChunkManager = ((ServerWorldExtension) this.getWorld()).noisiumchunkmanager$getServerWorldChunkManager();
 		var chunkPosition = new ChunkPos(chunkX, chunkZ);
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
 			cir.setReturnValue(noisiumServerWorldChunkManager.getIoWorldChunk(chunkPosition));
@@ -186,7 +190,7 @@ public abstract class ServerChunkManagerMixin {
 
 	@Inject(method = "onLightUpdate", at = @At(value = "HEAD"), cancellable = true)
 	private void noisiumchunkmanager$updateLightingViaNoisiumServerWorldChunkManager(LightType lightType, ChunkSectionPos chunkSectionPos, CallbackInfo ci) {
-		io.github.steveplays28.noisiumchunkmanager.experimental.server.world.chunk.event.ServerChunkEvent.LIGHT_UPDATE.invoker().onLightUpdate(lightType, chunkSectionPos);
+		ServerChunkEvent.LIGHT_UPDATE.invoker().onLightUpdate(lightType, chunkSectionPos);
 		ci.cancel();
 	}
 
@@ -197,7 +201,7 @@ public abstract class ServerChunkManagerMixin {
 
 	@Inject(method = "isChunkLoaded", at = @At(value = "HEAD"), cancellable = true)
 	private void noisiumchunkmanager$isChunkLoadedInNoisiumServerWorldChunkManager(int chunkX, int chunkZ, CallbackInfoReturnable<Boolean> cir) {
-		cir.setReturnValue(((io.github.steveplays28.noisiumchunkmanager.experimental.extension.world.server.ServerWorldExtension) this.getWorld()).noisiumchunkmanager$getServerWorldChunkManager().isChunkLoaded(
+		cir.setReturnValue(((ServerWorldExtension) this.getWorld()).noisiumchunkmanager$getServerWorldChunkManager().isChunkLoaded(
 				new ChunkPos(chunkX, chunkZ)));
 	}
 
@@ -213,12 +217,12 @@ public abstract class ServerChunkManagerMixin {
 
 	@Inject(method = "getNoiseConfig", at = @At(value = "HEAD"), cancellable = true)
 	private void noisiumchunkmanager$getNoiseConfigFromServerChunkManager(@NotNull CallbackInfoReturnable<NoiseConfig> cir) {
-		cir.setReturnValue(((io.github.steveplays28.noisiumchunkmanager.experimental.extension.world.server.ServerWorldExtension) this.getWorld()).noisiumchunkmanager$getNoiseConfig());
+		cir.setReturnValue(((ServerWorldExtension) this.getWorld()).noisiumchunkmanager$getNoiseConfig());
 	}
 
 	@Inject(method = "getChunkIoWorker", at = @At(value = "HEAD"), cancellable = true)
 	private void noisiumchunkmanager$getChunkIoWorkerFromNoisiumServerWorldChunkManager(@NotNull CallbackInfoReturnable<NbtScannable> cir) {
-		cir.setReturnValue(((io.github.steveplays28.noisiumchunkmanager.experimental.extension.world.server.ServerWorldExtension) this.getWorld()).noisiumchunkmanager$getServerWorldChunkManager().getChunkIoWorker());
+		cir.setReturnValue(((ServerWorldExtension) this.getWorld()).noisiumchunkmanager$getServerWorldChunkManager().getChunkIoWorker());
 	}
 
 	@Inject(method = {"getLoadedChunkCount", "getTotalChunksLoadedCount"}, at = @At(value = "HEAD"), cancellable = true)

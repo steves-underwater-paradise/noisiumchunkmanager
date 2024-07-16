@@ -1,4 +1,4 @@
-package io.github.steveplays28.noisiumchunkmanager.experimental.extension.world.chunk;
+package io.github.steveplays28.noisiumchunkmanager.extension.world.chunk;
 
 import java.util.BitSet;
 

@@ -1,8 +1,8 @@
-package io.github.steveplays28.noisiumchunkmanager.experimental.server.player;
+package io.github.steveplays28.noisiumchunkmanager.server.player;
 
 import dev.architectury.event.EventResult;
 import dev.architectury.event.events.common.BlockEvent;
-import io.github.steveplays28.noisiumchunkmanager.experimental.util.world.chunk.ChunkUtil;
+import io.github.steveplays28.noisiumchunkmanager.util.world.chunk.ChunkUtil;
 import net.minecraft.block.Blocks;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;

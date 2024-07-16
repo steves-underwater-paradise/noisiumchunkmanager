@@ -1,5 +1,6 @@
 package io.github.steveplays28.noisiumchunkmanager.mixin.world.gen.chunk;
 
+import io.github.steveplays28.noisiumchunkmanager.server.world.ServerWorldChunkManager;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.ObjectArraySet;
@@ -66,7 +67,7 @@ public abstract class ChunkGeneratorMixin {
 
 	/**
 	 * Replaces {@link ChunkGenerator#addStructureReferences} with a simpler one, that only checks the center chunk, instead of iterating outwards.
-	 * This fixes an infinite loop with {@link io.github.steveplays28.noisiumchunkmanager.experimental.server.world.ServerWorldChunkManager}.
+	 * This fixes an infinite loop with {@link ServerWorldChunkManager}.
 	 */
 	@Inject(method = "addStructureReferences", at = @At(value = "HEAD"), cancellable = true)
 	public void noisiumchunkmanager$replaceAddStructureReferencesToFixAnInfiniteLoop(StructureWorldAccess world, StructureAccessor structureAccessor, Chunk chunk, CallbackInfo ci) {

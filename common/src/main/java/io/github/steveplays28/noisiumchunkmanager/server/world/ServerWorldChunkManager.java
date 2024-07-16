@@ -6,10 +6,12 @@ import dev.architectury.event.events.common.LifecycleEvent;
 import dev.architectury.event.events.common.TickEvent;
 import io.github.steveplays28.noisiumchunkmanager.NoisiumChunkManager;
 import io.github.steveplays28.noisiumchunkmanager.config.NoisiumChunkManagerConfig;
+import io.github.steveplays28.noisiumchunkmanager.extension.world.chunk.WorldChunkExtension;
+import io.github.steveplays28.noisiumchunkmanager.server.world.chunk.event.ServerChunkEvent;
 import io.github.steveplays28.noisiumchunkmanager.util.world.chunk.ChunkUtil;
-import io.github.steveplays28.noisiumchunkmanager.experimental.world.chunk.IoWorldChunk;
 import io.github.steveplays28.noisiumchunkmanager.mixin.accessor.util.collection.PackedIntegerArrayAccessor;
 import io.github.steveplays28.noisiumchunkmanager.mixin.accessor.world.gen.chunk.ChunkGeneratorAccessor;
+import io.github.steveplays28.noisiumchunkmanager.world.chunk.IoWorldChunk;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.EntityType;
@@ -95,9 +97,8 @@ public class ServerWorldChunkManager {
 		this.ioWorldChunks = new ConcurrentHashMap<>();
 		this.loadedWorldChunks = new HashMap<>();
 
-		io.github.steveplays28.noisiumchunkmanager.experimental.server.world.chunk.event.ServerChunkEvent.LIGHT_UPDATE.register(
-				this::onLightUpdateAsync);
-		io.github.steveplays28.noisiumchunkmanager.experimental.server.world.chunk.event.ServerChunkEvent.BLOCK_CHANGE.register(this::onBlockChange);
+		ServerChunkEvent.LIGHT_UPDATE.register(this::onLightUpdateAsync);
+		ServerChunkEvent.BLOCK_CHANGE.register(this::onBlockChange);
 		TickEvent.SERVER_LEVEL_POST.register(instance -> {
 			if (!instance.equals(serverWorld) || instance.getPlayers().isEmpty()) {
 				return;
@@ -163,8 +164,7 @@ public class ServerWorldChunkManager {
 			fetchedWorldChunk.loadEntities();
 			loadingWorldChunks.remove(chunkPos);
 			loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
-			io.github.steveplays28.noisiumchunkmanager.experimental.server.world.chunk.event.ServerChunkEvent.WORLD_CHUNK_GENERATED.invoker().onWorldChunkGenerated(
-					fetchedWorldChunk);
+			ServerChunkEvent.WORLD_CHUNK_GENERATED.invoker().onWorldChunkGenerated(fetchedWorldChunk);
 		});
 		loadingWorldChunks.put(chunkPos, worldChunkCompletableFuture);
 		return worldChunkCompletableFuture;
@@ -195,8 +195,7 @@ public class ServerWorldChunkManager {
 			var fetchedWorldChunk = new WorldChunk(
 					serverWorld, generateChunk(chunkPos, this::getIoWorldChunk, ioWorldChunks::remove), null);
 			loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
-			io.github.steveplays28.noisiumchunkmanager.experimental.server.world.chunk.event.ServerChunkEvent.WORLD_CHUNK_GENERATED.invoker().onWorldChunkGenerated(
-					fetchedWorldChunk);
+			ServerChunkEvent.WORLD_CHUNK_GENERATED.invoker().onWorldChunkGenerated(fetchedWorldChunk);
 			return fetchedWorldChunk;
 		}
 
@@ -207,8 +206,7 @@ public class ServerWorldChunkManager {
 		serverWorld.getServer().executeSync(() -> fetchedWorldChunk.addChunkTickSchedulers(serverWorld));
 		fetchedWorldChunk.loadEntities();
 		loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
-		io.github.steveplays28.noisiumchunkmanager.experimental.server.world.chunk.event.ServerChunkEvent.WORLD_CHUNK_GENERATED.invoker().onWorldChunkGenerated(
-				fetchedWorldChunk);
+		ServerChunkEvent.WORLD_CHUNK_GENERATED.invoker().onWorldChunkGenerated(fetchedWorldChunk);
 		return fetchedWorldChunk;
 	}
 
@@ -303,7 +301,7 @@ public class ServerWorldChunkManager {
 
 		var chunkPosition = chunkSectionPosition.toChunkPos();
 		getChunkAsync(chunkPosition).whenCompleteAsync((worldChunk, throwable) -> {
-			var worldChunkExtension = (io.github.steveplays28.noisiumchunkmanager.experimental.extension.world.chunk.WorldChunkExtension) worldChunk;
+			var worldChunkExtension = (WorldChunkExtension) worldChunk;
 			var skyLightBits = worldChunkExtension.noisiumchunkmanager$getBlockLightBits();
 			var blockLightBits = worldChunkExtension.noisiumchunkmanager$getSkyLightBits();
 			int chunkSectionYPositionDifference = chunkSectionYPosition - bottomY;

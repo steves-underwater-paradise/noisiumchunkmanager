@@ -1,5 +1,6 @@
 package io.github.steveplays28.noisiumchunkmanager.mixin.server.network;
 
+import io.github.steveplays28.noisiumchunkmanager.extension.world.server.ServerWorldExtension;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.server.network.SpawnLocating;
@@ -19,18 +20,18 @@ public class SpawnLocatingMixin {
 	// TODO: Change to an @Inject at HEAD
 	/**
 	 * @author Steveplays28
-	 * @reason
+	 * @reason TODO
 	 */
 	@Overwrite
 	public static @Nullable BlockPos findOverworldSpawn(@NotNull ServerWorld serverWorld, int searchBlockPosX, int searchBlockPosZ) {
-		var noisiumServerWorldChunkManager = ((io.github.steveplays28.noisiumchunkmanager.experimental.extension.world.server.ServerWorldExtension) serverWorld).noisiumchunkmanager$getServerWorldChunkManager();
+		var noisiumServerWorldChunkManager = ((ServerWorldExtension) serverWorld).noisiumchunkmanager$getServerWorldChunkManager();
 		var chunkPosition = new ChunkPos(
 				ChunkSectionPos.getSectionCoord(searchBlockPosX), ChunkSectionPos.getSectionCoord(searchBlockPosZ));
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
 			return null;
 		}
 
-		var chunk = ((io.github.steveplays28.noisiumchunkmanager.experimental.extension.world.server.ServerWorldExtension) serverWorld).noisiumchunkmanager$getServerWorldChunkManager().getChunk(chunkPosition);
+		var chunk = noisiumServerWorldChunkManager.getChunk(chunkPosition);
 		int i = serverWorld.getDimension().hasCeiling() ? serverWorld.getChunkManager().getChunkGenerator().getSpawnHeight(
 				serverWorld) : chunk.sampleHeightmap(Heightmap.Type.MOTION_BLOCKING, searchBlockPosX & 15, searchBlockPosZ & 15);
 		if (i < serverWorld.getBottomY()) {

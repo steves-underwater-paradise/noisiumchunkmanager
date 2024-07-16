@@ -1,5 +1,6 @@
 package io.github.steveplays28.noisiumchunkmanager;
 
+import io.github.steveplays28.noisiumchunkmanager.server.NoisiumChunkManagerServerInitialiser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,6 +12,6 @@ public class NoisiumChunkManager {
 	public static void initialize() {
 		LOGGER.info("Loading {}.", MOD_NAME);
 
-		io.github.steveplays28.noisiumchunkmanager.experimental.server.NoisiumChunkManagerServerInitialiser.initialise();
+		NoisiumChunkManagerServerInitialiser.initialise();
 	}
 }

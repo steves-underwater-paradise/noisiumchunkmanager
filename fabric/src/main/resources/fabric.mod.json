@@ -37,10 +37,10 @@
   "environment": "*",
   "entrypoints": {
     "main": [
-      "io.github.steveplays28.noisium.fabric.NoisiumFabric"
+      "io.github.steveplays28.noisiumchunkmanager.fabric.NoisiumFabric"
     ],
     "modmenu": [
-      "io.github.steveplays28.noisium.client.compat.modmenu.NoisiumChunkManagerModMenuCompat"
+      "io.github.steveplays28.noisiumchunkmanager.client.compat.modmenu.NoisiumChunkManagerModMenuCompat"
     ]
   },
   "mixins": [

@@ -1,5 +1,6 @@
 package io.github.steveplays28.noisiumchunkmanager.mixin.client.gui.hud;
 
+import io.github.steveplays28.noisiumchunkmanager.extension.world.server.ServerWorldExtension;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.gui.hud.DebugHud;
@@ -34,7 +35,7 @@ public abstract class DebugHudMixin {
 			return;
 		}
 
-		@NotNull var noisiumServerWorldChunkManager = ((io.github.steveplays28.noisiumchunkmanager.experimental.extension.world.server.ServerWorldExtension) serverWorld).noisiumchunkmanager$getServerWorldChunkManager();
+		@NotNull var noisiumServerWorldChunkManager = ((ServerWorldExtension) serverWorld).noisiumchunkmanager$getServerWorldChunkManager();
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(playerChunkPosition)) {
 			cir.setReturnValue(null);
 			return;

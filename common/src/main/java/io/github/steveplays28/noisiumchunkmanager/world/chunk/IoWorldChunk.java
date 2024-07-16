@@ -1,4 +1,4 @@
-package io.github.steveplays28.noisiumchunkmanager.experimental.world.chunk;
+package io.github.steveplays28.noisiumchunkmanager.world.chunk;
 
 import net.minecraft.block.Block;
 import net.minecraft.fluid.Fluid;

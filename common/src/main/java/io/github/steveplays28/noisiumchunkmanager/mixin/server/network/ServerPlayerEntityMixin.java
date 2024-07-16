@@ -3,7 +3,9 @@ package io.github.steveplays28.noisiumchunkmanager.mixin.server.network;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.authlib.GameProfile;
+import io.github.steveplays28.noisiumchunkmanager.extension.world.server.ServerWorldExtension;
 import io.github.steveplays28.noisiumchunkmanager.mixin.accessor.server.network.SpawnLocatingAccessor;
+import io.github.steveplays28.noisiumchunkmanager.server.world.ServerWorldChunkManager;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -37,13 +39,13 @@ public abstract class ServerPlayerEntityMixin extends PlayerEntity {
 
 	@WrapOperation(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/ServerPlayerEntity;moveToSpawn(Lnet/minecraft/server/world/ServerWorld;)V"))
 	private void noisiumchunkmanager$moveToSpawnWrapGetChunkAsyncWhenComplete(@NotNull ServerPlayerEntity instance, @NotNull ServerWorld serverWorld, @NotNull Operation<Void> original) {
-		((io.github.steveplays28.noisiumchunkmanager.experimental.extension.world.server.ServerWorldExtension) serverWorld).noisiumchunkmanager$getServerWorldChunkManager().getChunkAsync(
+		((ServerWorldExtension) serverWorld).noisiumchunkmanager$getServerWorldChunkManager().getChunkAsync(
 				new ChunkPos(serverWorld.getSpawnPos())).whenComplete((worldChunk, throwable) -> original.call(instance, serverWorld));
 	}
 
 	/**
 	 * @author Steveplays28
-	 * @reason Wait for {@link net.minecraft.world.chunk.WorldChunk}s from the {@link ServerWorld}'s {@link io.github.steveplays28.noisiumchunkmanager.experimental.server.world.ServerWorldChunkManager} asynchronously.
+	 * @reason Wait for {@link net.minecraft.world.chunk.WorldChunk}s from the {@link ServerWorld}'s {@link ServerWorldChunkManager} asynchronously.
 	 */
 	@Overwrite
 	private void moveToSpawn(@NotNull ServerWorld serverWorld) {
@@ -78,7 +80,7 @@ public abstract class ServerPlayerEntityMixin extends PlayerEntity {
 			int s = q / (worldSpawnRadius * 2 + 1);
 			var searchPositionX = worldSpawnBlockPosition.getX() + r - worldSpawnRadius;
 			var searchPositionZ = worldSpawnBlockPosition.getZ() + s - worldSpawnRadius;
-			((io.github.steveplays28.noisiumchunkmanager.experimental.extension.world.server.ServerWorldExtension) serverWorld).noisiumchunkmanager$getServerWorldChunkManager().getChunkAsync(
+			((ServerWorldExtension) serverWorld).noisiumchunkmanager$getServerWorldChunkManager().getChunkAsync(
 					new ChunkPos(searchPositionX, searchPositionZ)).whenComplete((worldChunk, throwable) -> {
 				@Nullable var overworldSpawnBlockPosition = SpawnLocatingAccessor.invokeFindOverworldSpawn(
 						serverWorld, searchPositionX, searchPositionZ);
