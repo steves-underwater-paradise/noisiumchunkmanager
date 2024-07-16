@@ -1,5 +1,6 @@
 package io.github.steveplays28.noisiumchunkmanager.mixin.world;
 
+import io.github.steveplays28.noisiumchunkmanager.extension.world.server.ServerWorldExtension;
 import net.minecraft.block.BlockState;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.util.math.BlockPos;
@@ -25,7 +26,7 @@ public abstract class WorldMixin {
 			return;
 		}
 
-		var noisiumServerWorldChunkManager = ((io.github.steveplays28.noisiumchunkmanager.experimental.extension.world.server.ServerWorldExtension) this).noisiumchunkmanager$getServerWorldChunkManager();
+		var noisiumServerWorldChunkManager = ((ServerWorldExtension) this).noisiumchunkmanager$getServerWorldChunkManager();
 		var chunkPosition = new ChunkPos(chunkPositionX, chunkPositionZ);
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
 			cir.setReturnValue(noisiumServerWorldChunkManager.getIoWorldChunk(chunkPosition));
@@ -41,7 +42,7 @@ public abstract class WorldMixin {
 			return;
 		}
 
-		var noisiumServerWorldChunkManager = ((io.github.steveplays28.noisiumchunkmanager.experimental.extension.world.server.ServerWorldExtension) this).noisiumchunkmanager$getServerWorldChunkManager();
+		var noisiumServerWorldChunkManager = ((ServerWorldExtension) this).noisiumchunkmanager$getServerWorldChunkManager();
 		var chunkPosition = new ChunkPos(blockPosition);
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
 			cir.setReturnValue(noisiumServerWorldChunkManager.getIoWorldChunk(chunkPosition).getBlockState(blockPosition));
@@ -57,7 +58,7 @@ public abstract class WorldMixin {
 			return;
 		}
 
-		var noisiumServerWorldChunkManager = ((io.github.steveplays28.noisiumchunkmanager.experimental.extension.world.server.ServerWorldExtension) this).noisiumchunkmanager$getServerWorldChunkManager();
+		var noisiumServerWorldChunkManager = ((ServerWorldExtension) this).noisiumchunkmanager$getServerWorldChunkManager();
 		var chunkPosition = new ChunkPos(blockPosition);
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
 			cir.setReturnValue(noisiumServerWorldChunkManager.getIoWorldChunk(chunkPosition).getFluidState(blockPosition));
