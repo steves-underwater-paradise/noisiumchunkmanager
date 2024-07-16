@@ -59,10 +59,6 @@ processResources {
         include("assets", "data", "resourcepacks")
     }
 
-    filesMatching("architectury.common.json") {
-        expand "mod_id": rootProject.mod_id
-    }
-
     filesMatching("META-INF/mods.toml") {
         expand "version": project.version,
                 "mod_id": rootProject.mod_id,
