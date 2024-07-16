@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "io.github.steveplays28.noisiumchunkmanager.fabric.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "plugin": "io.github.steveplays28.noisiumchunkmanager.fabric.mixin.experimental.compat.fabric.api.networking.v1.NoisiumFabricMixinPlugin",
+  "mixins": [
+    "experimental.compat.fabric.api.networking.v1.PlayerLookupMixin"
+  ],
+  "client": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

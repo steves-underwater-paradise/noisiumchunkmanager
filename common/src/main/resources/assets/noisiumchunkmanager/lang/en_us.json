@@ -1,0 +1,7 @@
+{
+  "yacl3.config.noisium:config.category.server": "Server",
+  "yacl3.config.noisium:config.category.server.group.serverWorldChunkManager": "Server World Chunk Manager (experimental)",
+  "yacl3.config.noisium:config.serverWorldChunkManagerEnabled": "Server World Chunk Manager",
+  "yacl3.config.noisium:config.serverWorldChunkManagerThreads": "Server World Chunk Manager Threads",
+  "yacl3.config.noisium:config.serverWorldChunkManagerLightingThreads": "Server World Chunk Manager Lighting Threads"
+}

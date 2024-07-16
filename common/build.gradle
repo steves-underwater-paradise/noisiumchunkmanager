@@ -1,0 +1,50 @@
+//file:noinspection GroovyAccessibility
+//file:noinspection GroovyAssignabilityCheck
+
+architectury {
+    common(rootProject.enabled_platforms.split(","))
+}
+
+base {
+    archivesName = "${rootProject.archives_base_name}-common"
+}
+
+loom {
+    accessWidenerPath = file("src/main/resources/${mod_namespace}.accesswidener")
+}
+
+dependencies {
+    // We depend on fabric loader here to use the fabric @Environment annotations and get the mixin dependencies
+    // Do NOT use other classes from fabric loader
+    modImplementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
+
+    // Mixin Extras
+    compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:${rootProject.mixin_extras_version}"))
+
+    // Architectury API
+    modApi("dev.architectury:architectury:${rootProject.architectury_api_version}") { exclude group: 'net.fabricmc', module: 'fabric-loader' }
+
+    // YetAnotherConfigLib
+    modImplementation("dev.isxander:yet-another-config-lib:${rootProject.yet_another_config_lib_version}-fabric")
+
+    // Mod Menu
+    modImplementation("maven.modrinth:modmenu:${rootProject.mod_menu_version}")
+
+    // Distant Horizons
+    modImplementation("maven.modrinth:distanthorizons:${rootProject.distant_horizons_version}-${rootProject.minecraft_version}")
+}
+
+publishing {
+    publications {
+        mavenCommon(MavenPublication) {
+            groupId = rootProject.maven_group
+            artifactId = "${rootProject.archives_base_name}-common"
+            from components.java
+        }
+    }
+
+    // See https://docs.gradle.org/current/userguide/publishing_maven.html for information on how to set up publishing.
+    repositories {
+        // Add repositories to publish to here.
+    }
+}

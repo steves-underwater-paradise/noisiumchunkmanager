@@ -1,0 +1,36 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "io.github.steveplays28.noisiumchunkmanager.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "plugin": "io.github.steveplays28.noisiumchunkmanager.mixin.NoisiumChunkManagerMixinPlugin",
+  "mixins": [
+    "accessor.server.network.SpawnLocatingAccessor",
+    "accessor.util.collection.PackedIntegerArrayAccessor",
+    "accessor.world.gen.chunk.ChunkGeneratorAccessor",
+    "block.LichenGrowerGrowCheckerMixin",
+    "compat.distanthorizons.common.wrappers.world.gen.DHBatchGenerationEnvironmentMixin",
+    "server.MinecraftServerMixin",
+    "server.network.ServerPlayerEntityMixin",
+    "server.network.SpawnLocatingMixin",
+    "server.world.ServerChunkManagerMixin",
+    "server.world.ServerEntityManagerMixin",
+    "server.world.ServerWorldMixin",
+    "server.world.ThreadedAnvilChunkStorageMixin",
+    "world.ChunkRegionMixin",
+    "world.ChunkSectionCacheMixin",
+    "world.WorldMixin",
+    "world.chunk.PalettedContainerMixin",
+    "world.chunk.WorldChunkMixin",
+    "world.gen.chunk.ChunkGeneratorMixin",
+    "world.gen.chunk.NoiseChunkGeneratorMixin",
+    "world.gen.feature.OreFeatureMixin",
+    "world.storage.SerializingRegionBasedStorageMixin"
+  ],
+  "client": [
+    "client.gui.hud.DebugHudMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
