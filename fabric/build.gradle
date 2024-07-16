@@ -58,6 +58,10 @@ processResources {
         include("assets", "data", "resourcepacks")
     }
 
+    filesMatching("architectury.common.json") {
+        expand "mod_id": rootProject.mod_id
+    }
+
     filesMatching("fabric.mod.json") {
         expand "version": project.version,
                 "mod_id": rootProject.mod_id,
