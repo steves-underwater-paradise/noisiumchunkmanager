@@ -53,7 +53,9 @@
     "architectury": ">=${architectury_api_version}",
     "yet_another_config_lib_v3": ">=${yet_another_config_lib_version}-fabric"
   },
-  "suggests": {
-    "c2me": "*"
+  "breaks": {
+    "c2me": "*",
+    "vmp": "*",
+    "leavesbegone": "*"
   }
 }
