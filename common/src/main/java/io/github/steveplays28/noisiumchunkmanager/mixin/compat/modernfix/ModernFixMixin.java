@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(ModernFix.class)
+@Mixin(value = ModernFix.class, remap = false)
 public class ModernFixMixin {
 	/**
 	 * Prevents ModernFix from trying to access {@link net.minecraft.server.world.ThreadedAnvilChunkStorage}.
