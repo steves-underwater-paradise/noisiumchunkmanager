@@ -8,8 +8,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.Semaphore;
 
 @Mixin(PalettedContainer.class)
 public class PalettedContainerMixin {
@@ -19,7 +18,7 @@ public class PalettedContainerMixin {
 	private LockHelper lockHelper;
 
 	@Unique
-	private final Lock noisiumchunkmanager$lock = new ReentrantLock();
+	private final Semaphore noisiumchunkmanager$lock = new Semaphore(1);
 
 	@Inject(
 			method = {
@@ -39,7 +38,7 @@ public class PalettedContainerMixin {
 	 */
 	@Overwrite
 	public void lock() {
-		noisiumchunkmanager$lock.lock();
+		noisiumchunkmanager$lock.acquireUninterruptibly();
 	}
 
 	/**
@@ -48,6 +47,6 @@ public class PalettedContainerMixin {
 	 */
 	@Overwrite
 	public void unlock() {
-		noisiumchunkmanager$lock.unlock();
+		noisiumchunkmanager$lock.release();
 	}
 }

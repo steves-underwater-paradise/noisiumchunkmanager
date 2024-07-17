@@ -1,10 +1,17 @@
 package io.github.steveplays28.noisiumchunkmanager.mixin.server;
 
 import com.llamalad7.mixinextras.sugar.Local;
+import io.github.steveplays28.noisiumchunkmanager.extension.world.server.ServerWorldExtension;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.WorldGenerationProgressListener;
+import net.minecraft.server.world.ChunkTicketType;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.Unit;
+import net.minecraft.util.Util;
+import net.minecraft.util.math.ChunkPos;
 import org.jetbrains.annotations.NotNull;
-import org.spongepowered.asm.mixin.Mixin;
+import org.slf4j.Logger;
+import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
@@ -15,24 +22,48 @@ import java.util.stream.Stream;
 
 @Mixin(MinecraftServer.class)
 public abstract class MinecraftServerMixin<T> {
-//	@Shadow
-//	public abstract ServerWorld getOverworld();
-//
-//	@Redirect(method = "prepareStartRegion", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ServerChunkManager;addTicket(Lnet/minecraft/server/world/ChunkTicketType;Lnet/minecraft/util/math/ChunkPos;ILjava/lang/Object;)V"))
-//	private void noisiumchunkmanager$prepareStartRegionAddTicketForSpawnChunksToNoisiumServerWorldChunkManager(ServerChunkManager instance, ChunkTicketType<T> ticketType, ChunkPos chunkPos, int radius, T argument) {
-//		((NoisiumServerWorldExtension) getOverworld()).noisiumchunkmanager$getServerWorldChunkManager().getChunksInRadius(chunkPos, radius);
-//	}
-//
-//	@Redirect(method = "prepareStartRegion", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ServerChunkManager;getTotalChunksLoadedCount()I"))
-//	private int noisiumchunkmanager$prepareStartRegionRedirectTotalLoadedChunksToNoisiumServerWorldChunkManager(ServerChunkManager instance) {
-//		// TODO: Make the loadedWorldChunks field private again and remove this whole vanilla Minecraft system
-//		return ((NoisiumServerWorldExtension) getOverworld()).noisiumchunkmanager$getServerWorldChunkManager().loadedWorldChunks.size();
-//	}
-//
-//	@ModifyConstant(method = "prepareStartRegion", constant = @Constant(intValue = 441))
-//	private int noisiumchunkmanager$prepareStartRegionChangeTheAmountOfSpawnChunks(int original) {
-//		return 484;
-//	}
+	@Shadow
+	@Final
+	private static Logger LOGGER;
+	@Shadow
+	@Final
+	public static int START_TICKET_CHUNK_RADIUS;
+
+	@Shadow
+	private long timeReference;
+
+	@Shadow
+	protected abstract void updateMobSpawnOptions();
+
+	@Shadow
+	public abstract ServerWorld getOverworld();
+
+	@Shadow
+	protected abstract void runTasksTillTickEnd();
+
+	/**
+	 * @author Steveplays28
+	 * @reason Wait for the overworld's spawn chunk to be loaded.
+	 */
+	@Overwrite
+	private void prepareStartRegion(@NotNull WorldGenerationProgressListener worldGenerationProgressListener) {
+		@NotNull var overworld = this.getOverworld();
+		LOGGER.info("Preparing start region for dimension {}", overworld.getRegistryKey().getValue());
+		worldGenerationProgressListener.start();
+		this.timeReference = Util.getMeasuringTimeMs();
+
+		@NotNull var overworldSpawnChunkPosition = new ChunkPos(overworld.getSpawnPos());
+		overworld.getChunkManager().addTicket(ChunkTicketType.START, overworldSpawnChunkPosition, START_TICKET_CHUNK_RADIUS, Unit.INSTANCE);
+
+		@NotNull var noisiumServerWorldChunkManager = ((ServerWorldExtension) overworld).noisiumchunkmanager$getServerWorldChunkManager();
+		while (!noisiumServerWorldChunkManager.isChunkLoaded(overworldSpawnChunkPosition)) {
+			this.timeReference = Util.getMeasuringTimeMs() + 10L;
+			this.runTasksTillTickEnd();
+		}
+
+		worldGenerationProgressListener.stop();
+		this.updateMobSpawnOptions();
+	}
 
 	@Redirect(method = "shutdown", at = @At(value = "INVOKE", target = "Ljava/util/stream/Stream;anyMatch(Ljava/util/function/Predicate;)Z"))
 	private boolean noisiumchunkmanager$shutdownRedirectThreadedAnvilChunkStorageShouldDelayShutdown(@NotNull Stream<ServerWorld> instance, @NotNull Predicate<? super T> predicate) {

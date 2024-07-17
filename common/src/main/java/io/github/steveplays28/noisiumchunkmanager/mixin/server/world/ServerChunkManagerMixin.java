@@ -12,6 +12,7 @@ import net.minecraft.network.packet.s2c.play.BlockUpdateS2CPacket;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.server.WorldGenerationProgressListener;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ChunkTicketType;
 import net.minecraft.server.world.ServerChunkManager;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.server.world.ThreadedAnvilChunkStorage;
@@ -233,6 +234,25 @@ public abstract class ServerChunkManagerMixin {
 
 	@Inject(method = {"applyViewDistance", "applySimulationDistance"}, at = @At(value = "HEAD"), cancellable = true)
 	private void noisiumchunkmanager$cancelApplyViewAndSimulationDistance(int distance, @NotNull CallbackInfo ci) {
+		ci.cancel();
+	}
+
+	@Inject(method = "addTicket", at = @At(value = "HEAD"), cancellable = true)
+	private void noisiumchunkmanager$loadChunksInTicketRadius(@NotNull ChunkTicketType<?> ticketType, @NotNull ChunkPos chunkPosition, int radius, Object argument, @NotNull CallbackInfo ci) {
+		if (ticketType.getExpiryTicks() != 0L) {
+			ci.cancel();
+			return;
+		}
+
+		((ServerWorldExtension) this.getWorld()).noisiumchunkmanager$getServerWorldChunkManager().getChunksInRadiusAsync(
+				chunkPosition, radius);
+		ci.cancel();
+	}
+
+	@Inject(method = "removeTicket", at = @At(value = "HEAD"), cancellable = true)
+	private void noisiumchunkmanager$unloadChunksInTicketRadius(@NotNull ChunkTicketType<?> ticketType, @NotNull ChunkPos chunkPosition, int radius, Object argument, @NotNull CallbackInfo ci) {
+//		((ServerWorldExtension) this.getWorld()).noisiumchunkmanager$getServerWorldChunkManager().unloadChunk(
+//				chunkPosition, radius);
 		ci.cancel();
 	}
 }

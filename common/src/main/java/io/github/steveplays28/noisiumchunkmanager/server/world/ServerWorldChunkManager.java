@@ -228,9 +228,8 @@ public class ServerWorldChunkManager {
 	 * @param radius   A square radius of chunks.
 	 * @return All the {@link WorldChunk}s around the specified chunk, using a square radius.
 	 */
-	public @NotNull Map<@NotNull ChunkPos, @Nullable CompletableFuture<WorldChunk>> getChunksInRadiusAsync(@NotNull ChunkPos chunkPos, int radius) {
-		var chunks = new HashMap<@NotNull ChunkPos, @Nullable CompletableFuture<WorldChunk>>();
-
+	public @NotNull Map<ChunkPos, CompletableFuture<WorldChunk>> getChunksInRadiusAsync(@NotNull ChunkPos chunkPos, int radius) {
+		@NotNull var chunks = new HashMap<ChunkPos, CompletableFuture<WorldChunk>>();
 		for (int chunkPosX = chunkPos.x - radius; chunkPosX < chunkPos.x + radius; chunkPosX++) {
 			for (int chunkPosZ = chunkPos.z - radius; chunkPosZ < chunkPos.z + radius; chunkPosZ++) {
 				var chunkPosThatShouldBeLoaded = new ChunkPos(chunkPosX, chunkPosZ);

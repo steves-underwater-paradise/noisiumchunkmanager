@@ -94,7 +94,6 @@ public abstract class ServerPlayerEntityMixin extends PlayerEntity {
 			if (serverWorld.isSpaceEmpty(this)) {
 				break;
 			}
-
 		}
 	}
 }
