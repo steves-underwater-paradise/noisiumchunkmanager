@@ -11,6 +11,7 @@
     "block.LichenGrowerGrowCheckerMixin",
     "client.gui.WorldGenerationProgressTrackerMixin",
     "compat.distanthorizons.common.wrappers.world.gen.DHBatchGenerationEnvironmentMixin",
+    "compat.modernfix.ModernFixMixin",
     "server.MinecraftServerMixin",
     "server.WorldGenerationProgressLoggerMixin",
     "server.network.ServerPlayerEntityMixin",

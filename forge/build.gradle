@@ -48,6 +48,9 @@ dependencies {
     // YetAnotherConfigLib
     modRuntimeOnly("dev.isxander:yet-another-config-lib:${rootProject.yet_another_config_lib_version}-forge")
 
+    // ModernFix
+    modRuntimeOnly("maven.modrinth:modernfix:${rootProject.modernfix_version}")
+
     common(project(path: ":common", configuration: "namedElements")) { transitive false }
     shadowCommon(project(path: ":common", configuration: "transformProductionForge")) { transitive = false }
 }

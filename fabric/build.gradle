@@ -47,6 +47,9 @@ dependencies {
     // Mod Menu
     modRuntimeOnly "maven.modrinth:modmenu:${rootProject.mod_menu_version}"
 
+    // ModernFix
+    modRuntimeOnly("maven.modrinth:modernfix:${rootProject.modernfix_version}")
+
     common(project(path: ":common", configuration: "namedElements")) { transitive false }
     shadowCommon(project(path: ":common", configuration: "transformProductionFabric")) { transitive false }
 }

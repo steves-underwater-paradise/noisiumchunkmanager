@@ -17,9 +17,12 @@ import static io.github.steveplays28.noisiumchunkmanager.util.ModLoaderUtil.isMo
 public class NoisiumChunkManagerMixinPlugin implements IMixinConfigPlugin {
 	private static final @NotNull Supplier<Boolean> TRUE = () -> true;
 	private static final @NotNull String DISTANT_HORIZONS_MOD_ID = "distanthorizons";
+	private static final @NotNull String MODERNFIX_MOD_ID = "modernfix";
 	private static final @NotNull Map<String, Supplier<Boolean>> CONDITIONS = ImmutableMap.of(
-			"io.github.steveplays28.noisiumchunkmanager.mixin.experimental.compat.distanthorizons.common.wrappers.world.gen.DHBatchGenerationEnvironmentMixin",
-			() -> isModPresent(DISTANT_HORIZONS_MOD_ID)
+			"io.github.steveplays28.noisiumchunkmanager.mixin.compat.distanthorizons.common.wrappers.world.gen.DHBatchGenerationEnvironmentMixin",
+			() -> isModPresent(DISTANT_HORIZONS_MOD_ID),
+			"io.github.steveplays28.noisiumchunkmanager.mixin.compat.modernfix.ModernFixMixin",
+			() -> isModPresent(MODERNFIX_MOD_ID)
 	);
 
 	@Override

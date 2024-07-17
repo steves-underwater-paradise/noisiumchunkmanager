@@ -33,6 +33,9 @@ dependencies {
 
     // Distant Horizons
     modImplementation("maven.modrinth:distanthorizons:${rootProject.distant_horizons_version}-${rootProject.minecraft_version}")
+
+    // ModernFix
+    modImplementation("maven.modrinth:modernfix:${rootProject.modernfix_version}")
 }
 
 publishing {
