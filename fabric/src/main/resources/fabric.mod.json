@@ -18,6 +18,11 @@
     "modmenu": {
       "links": {
         "modmenu.discord": "https://discord.gg/KbWxgGg"
+      },
+      "parent": {
+        "id": "noisium",
+        "name": "Noisium (Standalone Addons)",
+        "description": "Standalone addons for Noisium that do not require Noisium."
       }
     },
     "mc-publish": {
