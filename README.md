@@ -28,8 +28,10 @@ None.
 Noisium Chunk Manager should be compatible with most of the popular world generation mods, as long as they do not interact with
 `ThreadedAnvilChunkStorage`, see the [description](#noisium-chunk-manager) above.
 
-- [Distant Horizons](https://modrinth.com/mod/distanthorizons): a compatibility mixin is included that adds compatibility for Distant
-  Horizons.
+- [Distant Horizons](https://modrinth.com/mod/distanthorizons)
+    - A compatibility mixin is included in Noisium Chunk Manager
+- [ModernFix](https://modrinth.com/mod/modernfix)
+    - `mixin.perf.remove_spawn_chunks=false` must be added to `config/modernfix-mixins.properties`
 
 ### Incompatibilities
 

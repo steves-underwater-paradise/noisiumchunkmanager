@@ -5,6 +5,7 @@ import com.mojang.datafixers.DataFixer;
 import dev.architectury.event.events.common.LifecycleEvent;
 import dev.architectury.event.events.common.PlayerEvent;
 import io.github.steveplays28.noisiumchunkmanager.server.world.ServerWorldChunkManager;
+import io.github.steveplays28.noisiumchunkmanager.server.world.ticket.ServerWorldTicketTracker;
 import io.github.steveplays28.noisiumchunkmanager.util.world.chunk.networking.packet.PacketUtil;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
@@ -66,6 +67,12 @@ public abstract class ServerWorldMixin implements ServerWorldExtension {
 	@Unique
 	private ServerWorldChunkManager noisiumchunkmanager$serverWorldChunkManager;
 	/**
+	 * Keeps a reference to this {@link ServerWorld}'s {@link ServerWorldTicketTracker}, to make sure it doesn't get garbage collected until the object is no longer necessary.
+	 */
+	@SuppressWarnings("unused")
+	@Unique
+	private ServerWorldTicketTracker noisiumchunkmanager$serverWorldTicketTracker;
+	/**
 	 * Keeps a reference to this {@link ServerWorld}'s {@link ServerWorldEntityTracker}, to make sure it doesn't get garbage collected until the object is no longer necessary.
 	 */
 	@SuppressWarnings("unused")
@@ -95,6 +102,10 @@ public abstract class ServerWorldMixin implements ServerWorldExtension {
 		);
 		noisiumchunkmanager$serverWorldChunkManager = new ServerWorldChunkManager(
 				serverWorld, chunkGenerator, noisiumchunkmanager$noiseConfig, session.getWorldDirectory(worldKey), dataFixer);
+		noisiumchunkmanager$serverWorldTicketTracker = new ServerWorldTicketTracker(
+				serverWorld, noisiumchunkmanager$serverWorldChunkManager::getChunksInRadiusAsync,
+				noisiumchunkmanager$serverWorldChunkManager::unloadChunk
+		);
 		noisiumchunkmanager$serverWorldEntityManager = new ServerWorldEntityTracker(
 				packet -> PacketUtil.sendPacketToPlayers(serverWorld.getPlayers(), packet));
 		noisiumchunkmanager$serverWorldPlayerChunkLoader = new ServerWorldPlayerChunkLoader(
@@ -121,6 +132,7 @@ public abstract class ServerWorldMixin implements ServerWorldExtension {
 		LifecycleEvent.SERVER_STOPPED.register(instance -> {
 			noisiumchunkmanager$serverWorldPlayerChunkLoader = null;
 			noisiumchunkmanager$serverWorldEntityManager = null;
+			noisiumchunkmanager$serverWorldTicketTracker = null;
 			noisiumchunkmanager$serverWorldChunkManager = null;
 			noisiumchunkmanager$noiseConfig = null;
 		});

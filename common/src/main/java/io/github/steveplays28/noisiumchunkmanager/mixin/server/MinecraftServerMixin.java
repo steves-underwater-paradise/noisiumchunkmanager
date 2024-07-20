@@ -1,6 +1,7 @@
 package io.github.steveplays28.noisiumchunkmanager.mixin.server;
 
 import com.llamalad7.mixinextras.sugar.Local;
+import io.github.steveplays28.noisiumchunkmanager.config.NoisiumChunkManagerConfig;
 import io.github.steveplays28.noisiumchunkmanager.extension.world.server.ServerWorldExtension;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.WorldGenerationProgressListener;
@@ -52,10 +53,15 @@ public abstract class MinecraftServerMixin<T> {
 		worldGenerationProgressListener.start();
 		this.timeReference = Util.getMeasuringTimeMs();
 
-		@NotNull var overworldSpawnChunkPosition = new ChunkPos(overworld.getSpawnPos());
-		overworld.getChunkManager().addTicket(ChunkTicketType.START, overworldSpawnChunkPosition, START_TICKET_CHUNK_RADIUS, Unit.INSTANCE);
-
 		@NotNull var noisiumServerWorldChunkManager = ((ServerWorldExtension) overworld).noisiumchunkmanager$getServerWorldChunkManager();
+		@NotNull var overworldSpawnChunkPosition = new ChunkPos(overworld.getSpawnPos());
+		if (NoisiumChunkManagerConfig.HANDLER.instance().loadSpawnChunks) {
+			overworld.getChunkManager().addTicket(
+					ChunkTicketType.START, overworldSpawnChunkPosition, START_TICKET_CHUNK_RADIUS, Unit.INSTANCE);
+		} else {
+			noisiumServerWorldChunkManager.getChunkAsync(overworldSpawnChunkPosition);
+		}
+
 		while (!noisiumServerWorldChunkManager.isChunkLoaded(overworldSpawnChunkPosition)) {
 			this.timeReference = Util.getMeasuringTimeMs() + 10L;
 			this.runTasksTillTickEnd();

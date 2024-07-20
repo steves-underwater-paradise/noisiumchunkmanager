@@ -2,6 +2,7 @@ package io.github.steveplays28.noisiumchunkmanager.mixin.server.world;
 
 import com.mojang.datafixers.DataFixer;
 import io.github.steveplays28.noisiumchunkmanager.extension.world.server.ServerWorldExtension;
+import io.github.steveplays28.noisiumchunkmanager.server.event.world.ticket.ServerWorldTicketEvent;
 import io.github.steveplays28.noisiumchunkmanager.server.world.ServerWorldChunkManager;
 import io.github.steveplays28.noisiumchunkmanager.server.world.chunk.event.ServerChunkEvent;
 import io.github.steveplays28.noisiumchunkmanager.server.world.event.ServerTickEvent;
@@ -33,6 +34,7 @@ import net.minecraft.world.gen.noise.NoiseConfig;
 import net.minecraft.world.level.storage.LevelStorage;
 import net.minecraft.world.storage.NbtScannable;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -55,13 +57,17 @@ public abstract class ServerChunkManagerMixin {
 	@Mutable
 	@Shadow
 	@Final
-	public ThreadedAnvilChunkStorage threadedAnvilChunkStorage;
+	public @Nullable ThreadedAnvilChunkStorage threadedAnvilChunkStorage;
 
 	@Shadow
 	public abstract @NotNull ChunkGenerator getChunkGenerator();
 
 	@Shadow
 	public abstract @NotNull NoiseConfig getNoiseConfig();
+
+	@Shadow
+	@Final
+	@NotNull ServerWorld world;
 
 	@Unique
 	private ChunkGenerator noisiumchunkmanager$chunkGenerator;
@@ -238,21 +244,14 @@ public abstract class ServerChunkManagerMixin {
 	}
 
 	@Inject(method = "addTicket", at = @At(value = "HEAD"), cancellable = true)
-	private void noisiumchunkmanager$loadChunksInTicketRadius(@NotNull ChunkTicketType<?> ticketType, @NotNull ChunkPos chunkPosition, int radius, Object argument, @NotNull CallbackInfo ci) {
-		if (ticketType.getExpiryTicks() != 0L) {
-			ci.cancel();
-			return;
-		}
-
-		((ServerWorldExtension) this.getWorld()).noisiumchunkmanager$getServerWorldChunkManager().getChunksInRadiusAsync(
-				chunkPosition, radius);
+	private void noisiumchunkmanager$invokeTicketCreatedEvent(@NotNull ChunkTicketType<?> ticketType, @NotNull ChunkPos chunkPosition, int radius, Object argument, @NotNull CallbackInfo ci) {
+		ServerWorldTicketEvent.TICKET_CREATED.invoker().onTicketCreated(this.world, ticketType, chunkPosition, radius);
 		ci.cancel();
 	}
 
 	@Inject(method = "removeTicket", at = @At(value = "HEAD"), cancellable = true)
-	private void noisiumchunkmanager$unloadChunksInTicketRadius(@NotNull ChunkTicketType<?> ticketType, @NotNull ChunkPos chunkPosition, int radius, Object argument, @NotNull CallbackInfo ci) {
-//		((ServerWorldExtension) this.getWorld()).noisiumchunkmanager$getServerWorldChunkManager().unloadChunk(
-//				chunkPosition, radius);
+	private void noisiumchunkmanager$invokeTicketRemovedEvent(@NotNull ChunkTicketType<?> ticketType, @NotNull ChunkPos chunkPosition, int radius, Object argument, @NotNull CallbackInfo ci) {
+		ServerWorldTicketEvent.TICKET_REMOVED.invoker().onTicketRemoved(this.world, chunkPosition);
 		ci.cancel();
 	}
 }

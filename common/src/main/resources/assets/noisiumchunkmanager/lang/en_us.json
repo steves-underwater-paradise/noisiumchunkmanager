@@ -1,6 +1,7 @@
 {
   "yacl3.config.noisiumchunkmanager:config.category.server": "Server",
   "yacl3.config.noisiumchunkmanager:config.category.server.group.serverWorldChunkManager": "Server World Chunk Manager (experimental)",
+  "yacl3.config.noisiumchunkmanager:config.loadSpawnChunks": "Load Spawn Chunks?",
   "yacl3.config.noisiumchunkmanager:config.serverWorldChunkManagerThreads": "Server World Chunk Manager Threads",
   "yacl3.config.noisiumchunkmanager:config.serverWorldChunkManagerThreads.desc": "The amount of threads used by a server world's chunk manager. Every world has its own chunk manager, and thus its own threads. After changing this option you MUST restart the server.",
   "yacl3.config.noisiumchunkmanager:config.serverWorldChunkManagerLightingThreads": "Server World Chunk Manager Lighting Threads",
