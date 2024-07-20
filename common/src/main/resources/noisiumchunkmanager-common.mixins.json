@@ -12,6 +12,7 @@
     "client.gui.WorldGenerationProgressTrackerMixin",
     "compat.distanthorizons.common.wrappers.world.gen.DHBatchGenerationEnvironmentMixin",
     "compat.modernfix.ModernFixMixin",
+    "entity.FallingBlockEntityMixin",
     "server.MinecraftServerMixin",
     "server.WorldGenerationProgressLoggerMixin",
     "server.network.ServerPlayerEntityMixin",

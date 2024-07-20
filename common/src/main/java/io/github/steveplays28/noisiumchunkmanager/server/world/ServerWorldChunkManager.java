@@ -42,6 +42,7 @@ import org.jetbrains.annotations.Nullable;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import static io.github.steveplays28.noisiumchunkmanager.NoisiumChunkManager.MOD_NAME;
@@ -58,6 +59,7 @@ public class ServerWorldChunkManager {
 	private final ServerWorld serverWorld;
 	private final ChunkGenerator chunkGenerator;
 	private final NoiseConfig noiseConfig;
+	private final Consumer<Runnable> syncRunnableConsumer;
 	private final PersistentStateManager persistentStateManager;
 	private final PointOfInterestStorage pointOfInterestStorage;
 	private final VersionedChunkStorage versionedChunkStorage;
@@ -65,16 +67,18 @@ public class ServerWorldChunkManager {
 	private final Executor noisePopulationThreadPoolExecutor;
 	private final Executor lightingThreadPoolExecutor;
 	private final ConcurrentMap<ChunkPos, CompletableFuture<WorldChunk>> loadingWorldChunks;
+	private final Queue<ChunkPos> unloadingWorldChunks;
 	private final ConcurrentMap<ChunkPos, IoWorldChunk> ioWorldChunks;
 	private final Map<ChunkPos, WorldChunk> loadedWorldChunks;
 
 	private boolean isStopping;
 
 	@SuppressWarnings("ResultOfMethodCallIgnored")
-	public ServerWorldChunkManager(@NotNull ServerWorld serverWorld, @NotNull ChunkGenerator chunkGenerator, @NotNull NoiseConfig noiseConfig, @NotNull Path worldDirectoryPath, DataFixer dataFixer) {
+	public ServerWorldChunkManager(@NotNull ServerWorld serverWorld, @NotNull ChunkGenerator chunkGenerator, @NotNull NoiseConfig noiseConfig, @NotNull Consumer<Runnable> syncRunnableConsumer, @NotNull Path worldDirectoryPath, @NotNull DataFixer dataFixer) {
 		this.serverWorld = serverWorld;
 		this.chunkGenerator = chunkGenerator;
 		this.noiseConfig = noiseConfig;
+		this.syncRunnableConsumer = syncRunnableConsumer;
 
 		var worldDataFile = worldDirectoryPath.resolve("data").toFile();
 		worldDataFile.mkdirs();
@@ -94,6 +98,7 @@ public class ServerWorldChunkManager {
 						"Noisium Server World Chunk Manager Lighting " + serverWorld.getDimension().effects() + " %d").build()
 		);
 		this.loadingWorldChunks = new ConcurrentHashMap<>();
+		this.unloadingWorldChunks = new ConcurrentLinkedQueue<>();
 		this.ioWorldChunks = new ConcurrentHashMap<>();
 		this.loadedWorldChunks = new HashMap<>();
 
@@ -160,11 +165,18 @@ public class ServerWorldChunkManager {
 				return;
 			}
 
-			serverWorld.getServer().executeSync(() -> fetchedWorldChunk.addChunkTickSchedulers(serverWorld));
+			syncRunnableConsumer.accept(() -> fetchedWorldChunk.addChunkTickSchedulers(serverWorld));
 			fetchedWorldChunk.loadEntities();
 			loadingWorldChunks.remove(chunkPos);
-			loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
-			ServerChunkEvent.WORLD_CHUNK_GENERATED.invoker().onWorldChunkGenerated(fetchedWorldChunk);
+
+			if (!unloadingWorldChunks.contains(chunkPos)) {
+				loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
+			}
+
+			syncRunnableConsumer.accept(
+					() -> ServerChunkEvent.WORLD_CHUNK_LOADED.invoker().onWorldChunkLoaded(serverWorld, fetchedWorldChunk));
+			unloadingWorldChunks.remove(chunkPos);
+			syncRunnableConsumer.accept(() -> ServerChunkEvent.WORLD_CHUNK_UNLOADED.invoker().onWorldChunkUnloaded(serverWorld, chunkPos));
 		});
 		loadingWorldChunks.put(chunkPos, worldChunkCompletableFuture);
 		return worldChunkCompletableFuture;
@@ -194,8 +206,14 @@ public class ServerWorldChunkManager {
 			// TODO: Schedule ProtoChunk worldgen and update loadedWorldChunks incrementally during worldgen steps
 			var fetchedWorldChunk = new WorldChunk(
 					serverWorld, generateChunk(chunkPos, this::getIoWorldChunk, ioWorldChunks::remove), null);
-			loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
-			ServerChunkEvent.WORLD_CHUNK_GENERATED.invoker().onWorldChunkGenerated(fetchedWorldChunk);
+			if (!unloadingWorldChunks.contains(chunkPos)) {
+				loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
+			}
+
+			syncRunnableConsumer.accept(
+					() -> ServerChunkEvent.WORLD_CHUNK_LOADED.invoker().onWorldChunkLoaded(serverWorld, fetchedWorldChunk));
+			unloadingWorldChunks.remove(chunkPos);
+			syncRunnableConsumer.accept(() -> ServerChunkEvent.WORLD_CHUNK_UNLOADED.invoker().onWorldChunkUnloaded(serverWorld, chunkPos));
 			return fetchedWorldChunk;
 		}
 
@@ -203,10 +221,16 @@ public class ServerWorldChunkManager {
 		var fetchedWorldChunk = new WorldChunk(serverWorld, fetchedChunk,
 				chunkToAddEntitiesTo -> serverWorld.addEntities(EntityType.streamFromNbt(fetchedChunk.getEntities(), serverWorld))
 		);
-		serverWorld.getServer().executeSync(() -> fetchedWorldChunk.addChunkTickSchedulers(serverWorld));
+		syncRunnableConsumer.accept(() -> fetchedWorldChunk.addChunkTickSchedulers(serverWorld));
 		fetchedWorldChunk.loadEntities();
-		loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
-		ServerChunkEvent.WORLD_CHUNK_GENERATED.invoker().onWorldChunkGenerated(fetchedWorldChunk);
+
+		if (!unloadingWorldChunks.contains(chunkPos)) {
+			loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
+		}
+
+		syncRunnableConsumer.accept(() -> ServerChunkEvent.WORLD_CHUNK_LOADED.invoker().onWorldChunkLoaded(serverWorld, fetchedWorldChunk));
+		unloadingWorldChunks.remove(chunkPos);
+		syncRunnableConsumer.accept(() -> ServerChunkEvent.WORLD_CHUNK_UNLOADED.invoker().onWorldChunkUnloaded(serverWorld, chunkPos));
 		return fetchedWorldChunk;
 	}
 
@@ -263,10 +287,12 @@ public class ServerWorldChunkManager {
 
 	public void unloadChunk(@NotNull ChunkPos chunkPosition) {
 		if (loadingWorldChunks.containsKey(chunkPosition)) {
-			loadingWorldChunks.get(chunkPosition).whenComplete((chunk, throwable) -> loadedWorldChunks.remove(chunkPosition));
+			unloadingWorldChunks.add(chunkPosition);
+			return;
 		}
 
 		loadedWorldChunks.remove(chunkPosition);
+		syncRunnableConsumer.accept(() -> ServerChunkEvent.WORLD_CHUNK_UNLOADED.invoker().onWorldChunkUnloaded(serverWorld, chunkPosition));
 	}
 
 	public boolean isChunkLoaded(ChunkPos chunkPos) {

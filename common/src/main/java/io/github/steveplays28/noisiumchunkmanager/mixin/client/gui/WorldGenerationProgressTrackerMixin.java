@@ -6,6 +6,7 @@ import net.fabricmc.api.Environment;
 import net.minecraft.client.gui.WorldGenerationProgressTracker;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.chunk.ChunkStatus;
+import net.minecraft.world.dimension.DimensionTypes;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
@@ -22,6 +23,12 @@ public abstract class WorldGenerationProgressTrackerMixin {
 
 	@Inject(method = "<init>", at = @At(value = "TAIL"))
 	private void noisiumchunkmanager$registerEventListeners(@NotNull CallbackInfo ci) {
-		ServerChunkEvent.WORLD_CHUNK_GENERATED.register(worldChunk -> this.setChunkStatus(worldChunk.getPos(), worldChunk.getStatus()));
+		ServerChunkEvent.WORLD_CHUNK_LOADED.register((instance, worldChunk) -> {
+			if (!instance.getDimension().effects().equals(DimensionTypes.OVERWORLD_ID)) {
+				return;
+			}
+
+			this.setChunkStatus(worldChunk.getPos(), worldChunk.getStatus());
+		});
 	}
 }

@@ -5,15 +5,19 @@ import com.mojang.datafixers.DataFixer;
 import dev.architectury.event.events.common.LifecycleEvent;
 import dev.architectury.event.events.common.PlayerEvent;
 import io.github.steveplays28.noisiumchunkmanager.server.world.ServerWorldChunkManager;
+import io.github.steveplays28.noisiumchunkmanager.server.world.chunk.tick.ServerWorldChunkTicker;
 import io.github.steveplays28.noisiumchunkmanager.server.world.ticket.ServerWorldTicketTracker;
 import io.github.steveplays28.noisiumchunkmanager.util.world.chunk.networking.packet.PacketUtil;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
+import net.minecraft.network.packet.Packet;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.WorldGenerationProgressListener;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ChunkLevelType;
+import net.minecraft.server.world.ServerChunkManager;
 import net.minecraft.server.world.ServerEntityManager;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
@@ -59,6 +63,9 @@ public abstract class ServerWorldMixin implements ServerWorldExtension {
 	@Shadow
 	public abstract @NotNull MinecraftServer getServer();
 
+	@Shadow
+	public abstract @NotNull List<ServerPlayerEntity> getPlayers();
+
 	@Unique
 	private NoiseConfig noisiumchunkmanager$noiseConfig;
 	/**
@@ -72,6 +79,12 @@ public abstract class ServerWorldMixin implements ServerWorldExtension {
 	@SuppressWarnings("unused")
 	@Unique
 	private ServerWorldTicketTracker noisiumchunkmanager$serverWorldTicketTracker;
+	/**
+	 * Keeps a reference to this {@link ServerWorld}'s {@link ServerWorldChunkTicker}, to make sure it doesn't get garbage collected until the object is no longer necessary.
+	 */
+	@SuppressWarnings("unused")
+	@Unique
+	private ServerWorldChunkTicker noisiumchunkmanager$serverWorldChunkTicker;
 	/**
 	 * Keeps a reference to this {@link ServerWorld}'s {@link ServerWorldEntityTracker}, to make sure it doesn't get garbage collected until the object is no longer necessary.
 	 */
@@ -101,11 +114,14 @@ public abstract class ServerWorldMixin implements ServerWorldExtension {
 				serverWorld.getSeed()
 		);
 		noisiumchunkmanager$serverWorldChunkManager = new ServerWorldChunkManager(
-				serverWorld, chunkGenerator, noisiumchunkmanager$noiseConfig, session.getWorldDirectory(worldKey), dataFixer);
+				serverWorld, chunkGenerator, noisiumchunkmanager$noiseConfig, this.getServer()::executeSync,
+				session.getWorldDirectory(worldKey), dataFixer
+		);
 		noisiumchunkmanager$serverWorldTicketTracker = new ServerWorldTicketTracker(
 				serverWorld, noisiumchunkmanager$serverWorldChunkManager::getChunksInRadiusAsync,
 				noisiumchunkmanager$serverWorldChunkManager::unloadChunk
 		);
+		noisiumchunkmanager$serverWorldChunkTicker = new ServerWorldChunkTicker(serverWorld);
 		noisiumchunkmanager$serverWorldEntityManager = new ServerWorldEntityTracker(
 				packet -> PacketUtil.sendPacketToPlayers(serverWorld.getPlayers(), packet));
 		noisiumchunkmanager$serverWorldPlayerChunkLoader = new ServerWorldPlayerChunkLoader(
@@ -127,11 +143,17 @@ public abstract class ServerWorldMixin implements ServerWorldExtension {
 		// TODO: Move this event listener registration to ServerEntityManagerMixin
 		//  or (when it's finished and able to completely replace the vanilla class) to NoisiumServerWorldEntityTracker
 		//  More efficient methods can be used when registering the event listener directly in the server entity manager
-		ServerChunkEvent.WORLD_CHUNK_GENERATED.register(worldChunk -> server.executeSync(
-				() -> this.entityManager.updateTrackingStatus(worldChunk.getPos(), ChunkLevelType.ENTITY_TICKING)));
+		ServerChunkEvent.WORLD_CHUNK_LOADED.register((instance, worldChunk) -> {
+			if (instance != serverWorld) {
+				return;
+			}
+
+			server.executeSync(() -> this.entityManager.updateTrackingStatus(worldChunk.getPos(), ChunkLevelType.ENTITY_TICKING));
+		});
 		LifecycleEvent.SERVER_STOPPED.register(instance -> {
 			noisiumchunkmanager$serverWorldPlayerChunkLoader = null;
 			noisiumchunkmanager$serverWorldEntityManager = null;
+			noisiumchunkmanager$serverWorldChunkTicker = null;
 			noisiumchunkmanager$serverWorldTicketTracker = null;
 			noisiumchunkmanager$serverWorldChunkManager = null;
 			noisiumchunkmanager$noiseConfig = null;
@@ -185,5 +207,14 @@ public abstract class ServerWorldMixin implements ServerWorldExtension {
 	@Override
 	public NoiseConfig noisiumchunkmanager$getNoiseConfig() {
 		return noisiumchunkmanager$noiseConfig;
+	}
+
+	@SuppressWarnings("ForLoopReplaceableByForEach")
+	@Override
+	public void noisiumchunkmanager$sendPacketToNearbyPlayers(@NotNull Packet<?> packet) {
+		@NotNull var players = this.getPlayers();
+		for (int i = 0; i < players.size(); i++) {
+			players.get(i).networkHandler.sendPacket(packet);
+		}
 	}
 }
