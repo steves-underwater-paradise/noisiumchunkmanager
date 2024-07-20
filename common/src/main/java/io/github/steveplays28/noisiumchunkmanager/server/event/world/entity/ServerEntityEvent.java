@@ -1,4 +1,4 @@
-package io.github.steveplays28.noisiumchunkmanager.server.world.entity.event;
+package io.github.steveplays28.noisiumchunkmanager.server.event.world.entity;
 
 import dev.architectury.event.Event;
 import dev.architectury.event.EventFactory;

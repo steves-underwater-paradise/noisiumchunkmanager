@@ -7,7 +7,7 @@ import dev.architectury.event.events.common.TickEvent;
 import io.github.steveplays28.noisiumchunkmanager.NoisiumChunkManager;
 import io.github.steveplays28.noisiumchunkmanager.config.NoisiumChunkManagerConfig;
 import io.github.steveplays28.noisiumchunkmanager.extension.world.chunk.WorldChunkExtension;
-import io.github.steveplays28.noisiumchunkmanager.server.world.chunk.event.ServerChunkEvent;
+import io.github.steveplays28.noisiumchunkmanager.server.event.world.chunk.ServerChunkEvent;
 import io.github.steveplays28.noisiumchunkmanager.util.world.chunk.ChunkUtil;
 import io.github.steveplays28.noisiumchunkmanager.mixin.accessor.util.collection.PackedIntegerArrayAccessor;
 import io.github.steveplays28.noisiumchunkmanager.mixin.accessor.world.gen.chunk.ChunkGeneratorAccessor;

@@ -2,6 +2,7 @@ package io.github.steveplays28.noisiumchunkmanager.mixin.world.chunk;
 
 import io.github.steveplays28.noisiumchunkmanager.extension.world.chunk.WorldChunkExtension;
 import net.minecraft.world.chunk.WorldChunk;
+import org.jetbrains.annotations.NotNull;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
@@ -15,12 +16,12 @@ public class WorldChunkMixin implements WorldChunkExtension {
 	private final BitSet noisiumchunkmanager$skyLightBits = new BitSet();
 
 	@Override
-	public BitSet noisiumchunkmanager$getBlockLightBits() {
+	public @NotNull BitSet noisiumchunkmanager$getBlockLightBits() {
 		return noisiumchunkmanager$blockLightBits;
 	}
 
 	@Override
-	public BitSet noisiumchunkmanager$getSkyLightBits() {
+	public @NotNull BitSet noisiumchunkmanager$getSkyLightBits() {
 		return noisiumchunkmanager$skyLightBits;
 	}
 }

@@ -1,6 +1,6 @@
 package io.github.steveplays28.noisiumchunkmanager.mixin.client.gui.hud;
 
-import io.github.steveplays28.noisiumchunkmanager.extension.world.server.ServerWorldExtension;
+import io.github.steveplays28.noisiumchunkmanager.server.extension.world.ServerWorldExtension;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.gui.hud.DebugHud;

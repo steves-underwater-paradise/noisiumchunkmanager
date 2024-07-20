@@ -1,12 +1,12 @@
 package io.github.steveplays28.noisiumchunkmanager.mixin.server.world;
 
 import com.mojang.datafixers.DataFixer;
-import io.github.steveplays28.noisiumchunkmanager.extension.world.server.ServerWorldExtension;
+import io.github.steveplays28.noisiumchunkmanager.server.extension.world.ServerWorldExtension;
 import io.github.steveplays28.noisiumchunkmanager.server.event.world.ticket.ServerWorldTicketEvent;
 import io.github.steveplays28.noisiumchunkmanager.server.world.ServerWorldChunkManager;
-import io.github.steveplays28.noisiumchunkmanager.server.world.chunk.event.ServerChunkEvent;
-import io.github.steveplays28.noisiumchunkmanager.server.world.event.ServerTickEvent;
-import io.github.steveplays28.noisiumchunkmanager.util.world.chunk.networking.packet.PacketUtil;
+import io.github.steveplays28.noisiumchunkmanager.server.event.world.chunk.ServerChunkEvent;
+import io.github.steveplays28.noisiumchunkmanager.server.event.world.ServerTickEvent;
+import io.github.steveplays28.noisiumchunkmanager.util.networking.packet.PacketUtil;
 import net.minecraft.entity.Entity;
 import net.minecraft.network.packet.Packet;
 import net.minecraft.network.packet.s2c.play.BlockUpdateS2CPacket;

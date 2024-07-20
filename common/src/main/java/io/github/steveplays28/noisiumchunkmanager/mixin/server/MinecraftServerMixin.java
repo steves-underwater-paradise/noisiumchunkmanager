@@ -2,7 +2,7 @@ package io.github.steveplays28.noisiumchunkmanager.mixin.server;
 
 import com.llamalad7.mixinextras.sugar.Local;
 import io.github.steveplays28.noisiumchunkmanager.config.NoisiumChunkManagerConfig;
-import io.github.steveplays28.noisiumchunkmanager.extension.world.server.ServerWorldExtension;
+import io.github.steveplays28.noisiumchunkmanager.server.extension.world.ServerWorldExtension;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.WorldGenerationProgressListener;
 import net.minecraft.server.world.ChunkTicketType;

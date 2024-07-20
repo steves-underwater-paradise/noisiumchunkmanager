@@ -1,6 +1,6 @@
 package io.github.steveplays28.noisiumchunkmanager.mixin.server.world;
 
-import io.github.steveplays28.noisiumchunkmanager.server.world.entity.event.ServerEntityEvent;
+import io.github.steveplays28.noisiumchunkmanager.server.event.world.entity.ServerEntityEvent;
 import net.minecraft.entity.Entity;
 import net.minecraft.server.world.ServerEntityManager;
 import net.minecraft.world.entity.EntityLike;

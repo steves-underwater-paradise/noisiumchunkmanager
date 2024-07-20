@@ -1,6 +1,6 @@
 package io.github.steveplays28.noisiumchunkmanager.mixin.world;
 
-import io.github.steveplays28.noisiumchunkmanager.extension.world.server.ServerWorldExtension;
+import io.github.steveplays28.noisiumchunkmanager.server.extension.world.ServerWorldExtension;
 import net.minecraft.block.BlockState;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.util.math.BlockPos;

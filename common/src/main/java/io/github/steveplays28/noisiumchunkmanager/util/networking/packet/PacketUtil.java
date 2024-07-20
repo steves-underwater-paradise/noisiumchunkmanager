@@ -1,4 +1,4 @@
-package io.github.steveplays28.noisiumchunkmanager.util.world.chunk.networking.packet;
+package io.github.steveplays28.noisiumchunkmanager.util.networking.packet;
 
 import net.minecraft.network.packet.Packet;
 import net.minecraft.server.network.ServerPlayerEntity;

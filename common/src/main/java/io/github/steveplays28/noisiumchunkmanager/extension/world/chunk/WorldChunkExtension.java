@@ -1,9 +1,11 @@
 package io.github.steveplays28.noisiumchunkmanager.extension.world.chunk;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.util.BitSet;
 
 public interface WorldChunkExtension {
-	BitSet noisiumchunkmanager$getBlockLightBits();
+	@NotNull BitSet noisiumchunkmanager$getBlockLightBits();
 
-	BitSet noisiumchunkmanager$getSkyLightBits();
+	@NotNull BitSet noisiumchunkmanager$getSkyLightBits();
 }

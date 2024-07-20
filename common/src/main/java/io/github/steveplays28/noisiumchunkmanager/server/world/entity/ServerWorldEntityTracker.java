@@ -2,8 +2,8 @@ package io.github.steveplays28.noisiumchunkmanager.server.world.entity;
 
 import dev.architectury.event.EventResult;
 import dev.architectury.event.events.common.EntityEvent;
-import io.github.steveplays28.noisiumchunkmanager.server.world.entity.event.ServerEntityEvent;
-import io.github.steveplays28.noisiumchunkmanager.server.world.event.ServerTickEvent;
+import io.github.steveplays28.noisiumchunkmanager.server.event.world.entity.ServerEntityEvent;
+import io.github.steveplays28.noisiumchunkmanager.server.event.world.ServerTickEvent;
 import net.minecraft.entity.Entity;
 import net.minecraft.network.packet.Packet;
 import net.minecraft.server.network.EntityTrackerEntry;

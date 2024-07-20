@@ -1,6 +1,6 @@
 package io.github.steveplays28.noisiumchunkmanager.mixin.server;
 
-import io.github.steveplays28.noisiumchunkmanager.server.world.chunk.event.ServerChunkEvent;
+import io.github.steveplays28.noisiumchunkmanager.server.event.world.chunk.ServerChunkEvent;
 import net.minecraft.server.WorldGenerationProgressLogger;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.chunk.ChunkStatus;

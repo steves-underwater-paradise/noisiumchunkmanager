@@ -1,7 +1,7 @@
 package io.github.steveplays28.noisiumchunkmanager.server.world.chunk.tick;
 
 import dev.architectury.event.events.common.TickEvent;
-import io.github.steveplays28.noisiumchunkmanager.server.world.chunk.event.ServerChunkEvent;
+import io.github.steveplays28.noisiumchunkmanager.server.event.world.chunk.ServerChunkEvent;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.GameRules;

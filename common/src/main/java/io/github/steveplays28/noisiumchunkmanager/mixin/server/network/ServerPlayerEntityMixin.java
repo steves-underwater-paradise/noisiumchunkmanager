@@ -3,7 +3,7 @@ package io.github.steveplays28.noisiumchunkmanager.mixin.server.network;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.authlib.GameProfile;
-import io.github.steveplays28.noisiumchunkmanager.extension.world.server.ServerWorldExtension;
+import io.github.steveplays28.noisiumchunkmanager.server.extension.world.ServerWorldExtension;
 import io.github.steveplays28.noisiumchunkmanager.mixin.accessor.server.network.SpawnLocatingAccessor;
 import io.github.steveplays28.noisiumchunkmanager.server.world.ServerWorldChunkManager;
 import net.minecraft.entity.player.PlayerEntity;

@@ -1,6 +1,6 @@
 package io.github.steveplays28.noisiumchunkmanager.mixin.client.gui;
 
-import io.github.steveplays28.noisiumchunkmanager.server.world.chunk.event.ServerChunkEvent;
+import io.github.steveplays28.noisiumchunkmanager.server.event.world.chunk.ServerChunkEvent;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.gui.WorldGenerationProgressTracker;

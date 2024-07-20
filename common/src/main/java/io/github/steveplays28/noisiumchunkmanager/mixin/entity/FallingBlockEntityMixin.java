@@ -1,6 +1,6 @@
 package io.github.steveplays28.noisiumchunkmanager.mixin.entity;
 
-import io.github.steveplays28.noisiumchunkmanager.extension.world.server.ServerWorldExtension;
+import io.github.steveplays28.noisiumchunkmanager.server.extension.world.ServerWorldExtension;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.FallingBlockEntity;
 import net.minecraft.network.packet.Packet;

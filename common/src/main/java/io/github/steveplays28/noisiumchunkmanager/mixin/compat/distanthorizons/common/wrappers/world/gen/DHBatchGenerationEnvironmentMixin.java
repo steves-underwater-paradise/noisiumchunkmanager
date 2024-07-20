@@ -1,7 +1,7 @@
 package io.github.steveplays28.noisiumchunkmanager.mixin.compat.distanthorizons.common.wrappers.world.gen;
 
 import com.llamalad7.mixinextras.sugar.Local;
-import io.github.steveplays28.noisiumchunkmanager.extension.world.server.ServerWorldExtension;
+import io.github.steveplays28.noisiumchunkmanager.server.extension.world.ServerWorldExtension;
 import loaderCommon.fabric.com.seibel.distanthorizons.common.wrappers.worldGeneration.BatchGenerationEnvironment;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.server.world.ThreadedAnvilChunkStorage;
