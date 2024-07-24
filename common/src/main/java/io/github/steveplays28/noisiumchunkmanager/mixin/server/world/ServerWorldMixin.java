@@ -6,6 +6,7 @@ import dev.architectury.event.events.common.LifecycleEvent;
 import dev.architectury.event.events.common.PlayerEvent;
 import io.github.steveplays28.noisiumchunkmanager.server.world.ServerWorldChunkManager;
 import io.github.steveplays28.noisiumchunkmanager.server.world.chunk.tick.ServerWorldChunkTicker;
+import io.github.steveplays28.noisiumchunkmanager.server.world.lighting.ServerWorldLightingProvider;
 import io.github.steveplays28.noisiumchunkmanager.server.world.ticket.ServerWorldTicketTracker;
 import io.github.steveplays28.noisiumchunkmanager.util.networking.packet.PacketUtil;
 import net.minecraft.block.BlockState;
@@ -20,10 +21,13 @@ import net.minecraft.server.world.ChunkLevelType;
 import net.minecraft.server.world.ServerEntityManager;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.random.RandomSequencesState;
 import net.minecraft.util.profiler.Profiler;
+import net.minecraft.world.LightType;
 import net.minecraft.world.PersistentStateManager;
 import net.minecraft.world.World;
+import net.minecraft.world.chunk.WorldChunk;
 import net.minecraft.world.dimension.DimensionOptions;
 import net.minecraft.world.gen.chunk.ChunkGenerator;
 import net.minecraft.world.gen.chunk.ChunkGeneratorSettings;
@@ -44,6 +48,7 @@ import io.github.steveplays28.noisiumchunkmanager.server.world.entity.player.Ser
 import io.github.steveplays28.noisiumchunkmanager.server.event.world.chunk.ServerChunkEvent;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
 @Debug(export = true)
@@ -72,6 +77,12 @@ public abstract class ServerWorldMixin implements ServerWorldExtension {
 	 */
 	@Unique
 	private ServerWorldChunkManager noisiumchunkmanager$serverWorldChunkManager;
+	/**
+	 * Keeps a reference to this {@link ServerWorld}'s {@link ServerWorldLightingProvider}, to make sure it doesn't get garbage collected until the object is no longer necessary.
+	 */
+	@SuppressWarnings("unused")
+	@Unique
+	private ServerWorldLightingProvider noisiumchunkmanager$serverWorldLightingProvider;
 	/**
 	 * Keeps a reference to this {@link ServerWorld}'s {@link ServerWorldTicketTracker}, to make sure it doesn't get garbage collected until the object is no longer necessary.
 	 */
@@ -112,8 +123,11 @@ public abstract class ServerWorldMixin implements ServerWorldExtension {
 				chunkGeneratorSettings, serverWorld.getRegistryManager().getWrapperOrThrow(RegistryKeys.NOISE_PARAMETERS),
 				serverWorld.getSeed()
 		);
+		noisiumchunkmanager$serverWorldLightingProvider = new ServerWorldLightingProvider(serverWorld);
 		noisiumchunkmanager$serverWorldChunkManager = new ServerWorldChunkManager(
 				serverWorld, chunkGenerator, noisiumchunkmanager$noiseConfig, this.getServer()::executeSync,
+				noisiumchunkmanager$getServerWorldLightingProvider()::initializeLight,
+				noisiumchunkmanager$getServerWorldLightingProvider()::light,
 				session.getWorldDirectory(worldKey), dataFixer
 		);
 		noisiumchunkmanager$serverWorldTicketTracker = new ServerWorldTicketTracker(
@@ -124,7 +138,9 @@ public abstract class ServerWorldMixin implements ServerWorldExtension {
 		noisiumchunkmanager$serverWorldEntityManager = new ServerWorldEntityTracker(
 				packet -> PacketUtil.sendPacketToPlayers(serverWorld.getPlayers(), packet));
 		noisiumchunkmanager$serverWorldPlayerChunkLoader = new ServerWorldPlayerChunkLoader(
-				serverWorld, noisiumchunkmanager$serverWorldChunkManager::getChunksInRadiusAsync,
+				serverWorld, () -> noisiumchunkmanager$serverWorldLightingProvider.getChunkLightingView(LightType.SKY),
+				() -> noisiumchunkmanager$serverWorldLightingProvider.getChunkLightingView(LightType.BLOCK),
+				noisiumchunkmanager$serverWorldChunkManager::getChunksInRadiusAsync,
 				noisiumchunkmanager$serverWorldChunkManager::getChunkAsync,
 				noisiumchunkmanager$serverWorldChunkManager::unloadChunk, server.getPlayerManager()::getViewDistance
 		);
@@ -155,6 +171,7 @@ public abstract class ServerWorldMixin implements ServerWorldExtension {
 			noisiumchunkmanager$serverWorldChunkTicker = null;
 			noisiumchunkmanager$serverWorldTicketTracker = null;
 			noisiumchunkmanager$serverWorldChunkManager = null;
+			noisiumchunkmanager$serverWorldLightingProvider = null;
 			noisiumchunkmanager$noiseConfig = null;
 		});
 	}
@@ -208,6 +225,11 @@ public abstract class ServerWorldMixin implements ServerWorldExtension {
 		return noisiumchunkmanager$noiseConfig;
 	}
 
+	@Override
+	public ServerWorldLightingProvider noisiumchunkmanager$getServerWorldLightingProvider() {
+		return noisiumchunkmanager$serverWorldLightingProvider;
+	}
+
 	@SuppressWarnings("ForLoopReplaceableByForEach")
 	@Override
 	public void noisiumchunkmanager$sendPacketToNearbyPlayers(@NotNull Packet<?> packet) {
@@ -215,5 +237,10 @@ public abstract class ServerWorldMixin implements ServerWorldExtension {
 		for (int i = 0; i < players.size(); i++) {
 			players.get(i).networkHandler.sendPacket(packet);
 		}
+	}
+
+	@Override
+	public @NotNull CompletableFuture<WorldChunk> noisiumchunkmanager$getChunkAsync(@NotNull ChunkPos chunkPosition) {
+		return noisiumchunkmanager$getServerWorldChunkManager().getChunkAsync(chunkPosition);
 	}
 }

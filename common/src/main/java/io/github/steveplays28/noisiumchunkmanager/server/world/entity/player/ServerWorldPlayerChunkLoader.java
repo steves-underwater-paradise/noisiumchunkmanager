@@ -11,6 +11,7 @@ import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.world.chunk.light.ChunkLightProvider;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -27,6 +28,8 @@ import java.util.function.Supplier;
 
 public class ServerWorldPlayerChunkLoader {
 	private final @NotNull ServerWorld serverWorld;
+	private final @NotNull Supplier<ChunkLightProvider<?, ?>> skyLightProviderSupplier;
+	private final @NotNull Supplier<ChunkLightProvider<?, ?>> blockLightProviderSupplier;
 	private final @NotNull Function<ChunkPos, CompletableFuture<WorldChunk>> worldChunkLoadFunction;
 	private final @NotNull Consumer<ChunkPos> worldChunkUnloadConsumer;
 	private final @NotNull Supplier<Integer> serverViewDistanceSupplier;
@@ -36,12 +39,16 @@ public class ServerWorldPlayerChunkLoader {
 
 	public ServerWorldPlayerChunkLoader(
 			@NotNull ServerWorld serverWorld,
+			@NotNull Supplier<ChunkLightProvider<?, ?>> skyLightProviderSupplier,
+			@NotNull Supplier<ChunkLightProvider<?, ?>> blockLightProviderSupplier,
 			@NotNull BiFunction<ChunkPos, Integer, Map<ChunkPos, CompletableFuture<WorldChunk>>> worldChunksInRadiusLoadFunction,
 			@NotNull Function<ChunkPos, CompletableFuture<WorldChunk>> worldChunkLoadFunction,
 			@NotNull Consumer<ChunkPos> worldChunkUnloadConsumer,
 			@NotNull Supplier<Integer> serverViewDistanceSupplier
 	) {
 		this.serverWorld = serverWorld;
+		this.skyLightProviderSupplier = skyLightProviderSupplier;
+		this.blockLightProviderSupplier = blockLightProviderSupplier;
 		this.worldChunkLoadFunction = worldChunkLoadFunction;
 		this.worldChunkUnloadConsumer = worldChunkUnloadConsumer;
 		this.serverViewDistanceSupplier = serverViewDistanceSupplier;
@@ -66,7 +73,8 @@ public class ServerWorldPlayerChunkLoader {
 			ChunkUtil.sendWorldChunksToPlayerAsync(
 					serverWorld,
 					new ArrayList<>(worldChunksInRadiusLoadFunction.apply(player.getChunkPos(), serverViewDistanceSupplier.get()).values()),
-					threadPoolExecutor
+					serverWorld.countVerticalSections() + 2, serverWorld.getBottomSectionCoord() - 1,
+					skyLightProviderSupplier.get(), blockLightProviderSupplier.get(), threadPoolExecutor
 			);
 			previousPlayerPositions.put(player.getId(), player.getPos());
 		});
@@ -112,7 +120,10 @@ public class ServerWorldPlayerChunkLoader {
 					playerChunkPositionsInServerViewDistance, previousPlayerChunkPositionsInServerViewDistance);
 			for (int chunkPositionsToLoadIndex = 0; chunkPositionsToLoadIndex < chunkPositionsToLoad.size(); chunkPositionsToLoadIndex++) {
 				ChunkUtil.sendWorldChunkToPlayerAsync(
-						serverWorld, worldChunkLoadFunction.apply(chunkPositionsToLoad.get(chunkPositionsToLoadIndex)), threadPoolExecutor);
+						serverWorld, worldChunkLoadFunction.apply(chunkPositionsToLoad.get(chunkPositionsToLoadIndex)),
+						serverWorld.countVerticalSections() + 2, serverWorld.getBottomSectionCoord() - 1,
+						skyLightProviderSupplier.get(), blockLightProviderSupplier.get(), threadPoolExecutor
+				);
 			}
 
 			// Send new render distance center to the player asynchronously

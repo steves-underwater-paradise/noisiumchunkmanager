@@ -4,7 +4,6 @@ import com.mojang.datafixers.DataFixer;
 import io.github.steveplays28.noisiumchunkmanager.server.extension.world.ServerWorldExtension;
 import io.github.steveplays28.noisiumchunkmanager.server.event.world.ticket.ServerWorldTicketEvent;
 import io.github.steveplays28.noisiumchunkmanager.server.world.ServerWorldChunkManager;
-import io.github.steveplays28.noisiumchunkmanager.server.event.world.chunk.ServerChunkEvent;
 import io.github.steveplays28.noisiumchunkmanager.server.event.world.ServerTickEvent;
 import io.github.steveplays28.noisiumchunkmanager.util.networking.packet.PacketUtil;
 import net.minecraft.entity.Entity;
@@ -13,10 +12,7 @@ import net.minecraft.network.packet.s2c.play.BlockUpdateS2CPacket;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.server.WorldGenerationProgressListener;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ChunkTicketType;
-import net.minecraft.server.world.ServerChunkManager;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.server.world.ThreadedAnvilChunkStorage;
+import net.minecraft.server.world.*;
 import net.minecraft.structure.StructureTemplateManager;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
@@ -52,22 +48,26 @@ import java.util.function.Supplier;
 @Mixin(ServerChunkManager.class)
 public abstract class ServerChunkManagerMixin {
 	@Shadow
-	public abstract World getWorld();
-
+	@Final
 	@Mutable
+	public @Nullable ThreadedAnvilChunkStorage threadedAnvilChunkStorage;
+
 	@Shadow
 	@Final
-	public @Nullable ThreadedAnvilChunkStorage threadedAnvilChunkStorage;
+	@NotNull ServerWorld world;
+	@Shadow
+	@Final
+	@Mutable
+	@Nullable ServerLightingProvider lightingProvider;
+
+	@Shadow
+	public abstract World getWorld();
 
 	@Shadow
 	public abstract @NotNull ChunkGenerator getChunkGenerator();
 
 	@Shadow
 	public abstract @NotNull NoiseConfig getNoiseConfig();
-
-	@Shadow
-	@Final
-	@NotNull ServerWorld world;
 
 	@Unique
 	private ChunkGenerator noisiumchunkmanager$chunkGenerator;
@@ -81,7 +81,8 @@ public abstract class ServerChunkManagerMixin {
 				this.getWorld().getRegistryManager().getWrapperOrThrow(RegistryKeys.STRUCTURE_SET), this.getNoiseConfig(),
 				((ServerWorld) this.getWorld()).getSeed()
 		);
-		threadedAnvilChunkStorage = null;
+		this.lightingProvider = null;
+		this.threadedAnvilChunkStorage = null;
 	}
 
 	@Inject(method = "executeQueuedTasks", at = @At(value = "HEAD"), cancellable = true)
@@ -197,7 +198,6 @@ public abstract class ServerChunkManagerMixin {
 
 	@Inject(method = "onLightUpdate", at = @At(value = "HEAD"), cancellable = true)
 	private void noisiumchunkmanager$updateLightingViaNoisiumServerWorldChunkManager(LightType lightType, ChunkSectionPos chunkSectionPos, CallbackInfo ci) {
-		ServerChunkEvent.LIGHT_UPDATE.invoker().onLightUpdate(lightType, chunkSectionPos);
 		ci.cancel();
 	}
 

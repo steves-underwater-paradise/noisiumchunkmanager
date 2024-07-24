@@ -10,3 +10,6 @@ accessible field net/minecraft/world/chunk/PalettedContainer paletteProvider Lne
 
 accessible class net/minecraft/world/chunk/PalettedContainer$Data
 accessible field net/minecraft/world/chunk/PalettedContainer$Data palette Lnet/minecraft/world/chunk/Palette;
+
+accessible class net/minecraft/world/chunk/light/SkyLightStorage$Data
+accessible class net/minecraft/world/chunk/light/BlockLightStorage$Data
