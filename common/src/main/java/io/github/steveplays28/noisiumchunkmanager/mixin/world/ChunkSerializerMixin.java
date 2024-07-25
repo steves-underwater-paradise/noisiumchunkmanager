@@ -35,13 +35,13 @@ public class ChunkSerializerMixin {
 
 	@Redirect(method = "deserialize", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/chunk/light/LightingProvider;setRetainData(Lnet/minecraft/util/math/ChunkPos;Z)V"))
 	private static void noisiumchunkmanager$redirectRetainLightingDataToServerWorldLightingProvider(@Nullable LightingProvider instance, @NotNull ChunkPos chunkPosition, boolean retainLightingData, @Local(ordinal = 0, argsOnly = true) @NotNull ServerWorld serverWorld) {
-		((ServerWorldExtension) serverWorld).noisiumchunkmanager$getServerWorldLightingProvider().setRetainLightingData(
+		((ServerWorldExtension) serverWorld).noisiumchunkmanager$getServerWorldLightingProvider().setRetainData(
 				chunkPosition, retainLightingData);
 	}
 
 	@Redirect(method = "deserialize", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/chunk/light/LightingProvider;enqueueSectionData(Lnet/minecraft/world/LightType;Lnet/minecraft/util/math/ChunkSectionPos;Lnet/minecraft/world/chunk/ChunkNibbleArray;)V"))
 	private static void noisiumchunkmanager$redirectEnqueueSectionDataToServerWorldLightingProvider(@Nullable LightingProvider instance, @NotNull LightType lightType, @NotNull ChunkSectionPos chunkSectionPosition, @NotNull ChunkNibbleArray chunkLightingDataNibbleArray, @Local(ordinal = 0, argsOnly = true) @NotNull ServerWorld serverWorld) {
-		((ServerWorldExtension) serverWorld).noisiumchunkmanager$getServerWorldLightingProvider().enqueueChunkSectionLightingData(
+		((ServerWorldExtension) serverWorld).noisiumchunkmanager$getServerWorldLightingProvider().enqueueSectionData(
 				lightType, chunkSectionPosition, chunkLightingDataNibbleArray);
 	}
 }

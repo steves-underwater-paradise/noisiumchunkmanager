@@ -22,6 +22,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.*;
 import net.minecraft.world.chunk.*;
+import net.minecraft.world.chunk.light.LightingProvider;
 import net.minecraft.world.gen.GenerationStep;
 import net.minecraft.world.gen.chunk.Blender;
 import net.minecraft.world.gen.chunk.ChunkGenerator;
@@ -41,6 +42,7 @@ import java.util.concurrent.*;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import static io.github.steveplays28.noisiumchunkmanager.NoisiumChunkManager.MOD_NAME;
 
@@ -57,6 +59,7 @@ public class ServerWorldChunkManager {
 	private final ChunkGenerator chunkGenerator;
 	private final NoiseConfig noiseConfig;
 	private final Consumer<Runnable> syncRunnableConsumer;
+	private final Supplier<LightingProvider> lightingProviderSupplier;
 	private final BiFunction<Chunk, Boolean, CompletableFuture<Chunk>> initializeChunkLightingBiFunction;
 	private final BiFunction<Chunk, Boolean, CompletableFuture<Chunk>> lightChunkBiFunction;
 	private final PersistentStateManager persistentStateManager;
@@ -72,11 +75,12 @@ public class ServerWorldChunkManager {
 	private boolean isStopping;
 
 	@SuppressWarnings("ResultOfMethodCallIgnored")
-	public ServerWorldChunkManager(@NotNull ServerWorld serverWorld, @NotNull ChunkGenerator chunkGenerator, @NotNull NoiseConfig noiseConfig, @NotNull Consumer<Runnable> syncRunnableConsumer, @NotNull BiFunction<Chunk, Boolean, CompletableFuture<Chunk>> initializeChunkLightingBiFunction, @NotNull BiFunction<Chunk, Boolean, CompletableFuture<Chunk>> lightChunkBiFunction, @NotNull Path worldDirectoryPath, @NotNull DataFixer dataFixer) {
+	public ServerWorldChunkManager(@NotNull ServerWorld serverWorld, @NotNull ChunkGenerator chunkGenerator, @NotNull NoiseConfig noiseConfig, @NotNull Consumer<Runnable> syncRunnableConsumer, @NotNull Supplier<LightingProvider> lightingProviderSupplier, @NotNull BiFunction<Chunk, Boolean, CompletableFuture<Chunk>> initializeChunkLightingBiFunction, @NotNull BiFunction<Chunk, Boolean, CompletableFuture<Chunk>> lightChunkBiFunction, @NotNull Path worldDirectoryPath, @NotNull DataFixer dataFixer) {
 		this.serverWorld = serverWorld;
 		this.chunkGenerator = chunkGenerator;
 		this.noiseConfig = noiseConfig;
 		this.syncRunnableConsumer = syncRunnableConsumer;
+		this.lightingProviderSupplier = lightingProviderSupplier;
 		this.initializeChunkLightingBiFunction = initializeChunkLightingBiFunction;
 		this.lightChunkBiFunction = lightChunkBiFunction;
 
@@ -143,7 +147,7 @@ public class ServerWorldChunkManager {
 				return new WorldChunk(
 						serverWorld,
 						generateChunk(
-								chunkPos, this::getIoWorldChunk, ioWorldChunks::remove,
+								chunkPos, lightingProviderSupplier, this::getIoWorldChunk, ioWorldChunks::remove,
 								initializeChunkLightingBiFunction, lightChunkBiFunction
 						),
 						null
@@ -206,7 +210,7 @@ public class ServerWorldChunkManager {
 			var fetchedWorldChunk = new WorldChunk(
 					serverWorld,
 					generateChunk(
-							chunkPos, this::getIoWorldChunk, ioWorldChunks::remove,
+							chunkPos, lightingProviderSupplier, this::getIoWorldChunk, ioWorldChunks::remove,
 							initializeChunkLightingBiFunction, lightChunkBiFunction
 					),
 					null
@@ -348,10 +352,12 @@ public class ServerWorldChunkManager {
 	}
 
 	// TODO: Move this into the constructor as a Supplier<ChunkPos, ProtoChunk>
-	private @NotNull ProtoChunk generateChunk(@NotNull ChunkPos chunkPos, @NotNull Function<ChunkPos, IoWorldChunk> ioWorldChunkGetFunction, @NotNull Function<ChunkPos, IoWorldChunk> ioWorldChunkRemoveFunction, @NotNull BiFunction<Chunk, Boolean, CompletableFuture<Chunk>> initializeChunkLightingBiConsumer, @NotNull BiFunction<Chunk, Boolean, CompletableFuture<Chunk>> lightChunkBiConsumer) {
+	private @NotNull ProtoChunk generateChunk(@NotNull ChunkPos chunkPos, @NotNull Supplier<LightingProvider> lightingProviderSupplier, @NotNull Function<ChunkPos, IoWorldChunk> ioWorldChunkGetFunction, @NotNull Function<ChunkPos, IoWorldChunk> ioWorldChunkRemoveFunction, @NotNull BiFunction<Chunk, Boolean, CompletableFuture<Chunk>> initializeChunkLightingBiConsumer, @NotNull BiFunction<Chunk, Boolean, CompletableFuture<Chunk>> lightChunkBiConsumer) {
 		var protoChunk = new ProtoChunk(chunkPos, UpgradeData.NO_UPGRADE_DATA, serverWorld,
 				serverWorld.getRegistryManager().get(RegistryKeys.BIOME), null
 		);
+		protoChunk.setLightingProvider(lightingProviderSupplier.get());
+
 		List<Chunk> chunkRegionChunks = List.of(protoChunk);
 		var chunkRegion = new ChunkRegion(serverWorld, chunkRegionChunks, ChunkStatus.FULL, 1);
 		var blender = Blender.getBlender(chunkRegion);

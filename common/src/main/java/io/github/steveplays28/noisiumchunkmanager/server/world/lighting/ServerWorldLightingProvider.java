@@ -25,24 +25,15 @@ import java.util.concurrent.Executors;
 
 /**
  * A lighting provider for {@link ServerWorld}s.
- * This class cannot extend {@link ServerLightingProvider} or {@link LightingProvider} due to the superclass being hard to change, causing {@link ServerWorldLightingProvider} to require a lot of workarounds to function.
+ * This class cannot extend {@link ServerLightingProvider} due to the superclass being hard to change, causing {@link ServerWorldLightingProvider} to require a lot of workarounds to function.
  */
-public class ServerWorldLightingProvider implements LightingView {
+@SuppressWarnings("DataFlowIssue")
+public class ServerWorldLightingProvider extends LightingProvider {
 	private final @NotNull ServerWorld serverWorld;
 	private final @NotNull Executor threadPoolExecutor;
-	private final @NotNull ChunkBlockLightProvider blockLightProvider;
-	private final @NotNull ChunkSkyLightProvider skyLightProvider;
 
 	public ServerWorldLightingProvider(@NotNull ServerWorld serverWorld) {
-		this.serverWorld = serverWorld;
-
-		this.threadPoolExecutor = Executors.newFixedThreadPool(
-				NoisiumChunkManagerConfig.HANDLER.instance().serverWorldChunkManagerLightingThreads,
-				new ThreadFactoryBuilder().setNameFormat(
-						"Noisium Server World Lighting Provider " + serverWorld.getDimension().effects() + " %d").build()
-		);
-
-		@NotNull var chunkProvider = new ChunkProvider() {
+		super(new ChunkProvider() {
 			@Override
 			public @Nullable LightSourceView getChunk(int chunkX, int chunkZ) {
 				return serverWorld.getChunk(chunkX, chunkZ);
@@ -52,14 +43,14 @@ public class ServerWorldLightingProvider implements LightingView {
 			public BlockView getWorld() {
 				return serverWorld;
 			}
+		}, true, true);
+		this.serverWorld = serverWorld;
 
-			@Override
-			public void onLightUpdate(@NotNull LightType lightType, @NotNull ChunkSectionPos chunkSectionPosition) {
-				ServerChunkEvent.LIGHT_UPDATE.invoker().onLightUpdate(lightType, chunkSectionPosition);
-			}
-		};
-		this.blockLightProvider = new ChunkBlockLightProvider(chunkProvider);
-		this.skyLightProvider = new ChunkSkyLightProvider(chunkProvider);
+		this.threadPoolExecutor = Executors.newFixedThreadPool(
+				NoisiumChunkManagerConfig.HANDLER.instance().serverWorldChunkManagerLightingThreads,
+				new ThreadFactoryBuilder().setNameFormat(
+						"Noisium Server World Lighting Provider " + serverWorld.getDimension().effects() + " %d").build()
+		);
 
 		ServerChunkEvent.LIGHT_UPDATE.register(this::onLightUpdateAsync);
 		TickEvent.SERVER_LEVEL_POST.register(instance -> {
@@ -109,6 +100,21 @@ public class ServerWorldLightingProvider implements LightingView {
 		skyLightProvider.propagateLight(chunkPosition);
 	}
 
+	@Override
+	public void setRetainData(@NotNull ChunkPos chunkPosition, boolean retainLightingData) {
+		blockLightProvider.setRetainColumn(chunkPosition, retainLightingData);
+		skyLightProvider.setRetainColumn(chunkPosition, retainLightingData);
+	}
+
+	@Override
+	public void enqueueSectionData(@NotNull LightType lightType, @NotNull ChunkSectionPos chunkSectionPosition, @Nullable ChunkNibbleArray chunkLightingDataNibbleArray) {
+		var chunkSectionPositionAsLong = chunkSectionPosition.asLong();
+		switch (lightType) {
+			case BLOCK -> blockLightProvider.enqueueSectionData(chunkSectionPositionAsLong, chunkLightingDataNibbleArray);
+			case SKY -> skyLightProvider.enqueueSectionData(chunkSectionPositionAsLong, chunkLightingDataNibbleArray);
+		}
+	}
+
 	@SuppressWarnings("DuplicateBranchesInSwitch")
 	public @NotNull ChunkLightProvider<?, ?> getChunkLightingView(@NotNull LightType lightType) {
 		@NotNull ChunkLightProvider<?, ?> chunkLightProvider;
@@ -118,19 +124,6 @@ public class ServerWorldLightingProvider implements LightingView {
 			default -> chunkLightProvider = skyLightProvider;
 		}
 		return chunkLightProvider;
-	}
-
-	public void setRetainLightingData(@NotNull ChunkPos chunkPosition, boolean retainLightingData) {
-		blockLightProvider.setRetainColumn(chunkPosition, retainLightingData);
-		skyLightProvider.setRetainColumn(chunkPosition, retainLightingData);
-	}
-
-	public void enqueueChunkSectionLightingData(@NotNull LightType lightType, @NotNull ChunkSectionPos chunkSectionPosition, @Nullable ChunkNibbleArray chunkLightingDataNibbleArray) {
-		var chunkSectionPositionAsLong = chunkSectionPosition.asLong();
-		switch (lightType) {
-			case BLOCK -> blockLightProvider.enqueueSectionData(chunkSectionPositionAsLong, chunkLightingDataNibbleArray);
-			case SKY -> skyLightProvider.enqueueSectionData(chunkSectionPositionAsLong, chunkLightingDataNibbleArray);
-		}
 	}
 
 	public @NotNull CompletableFuture<Chunk> initializeLight(@NotNull Chunk chunk, boolean retainLightingData) {
@@ -144,15 +137,15 @@ public class ServerWorldLightingProvider implements LightingView {
 				}
 
 				@NotNull var chunkSectionPosition = ChunkSectionPos.from(chunkPosition, serverWorld.sectionIndexToCoord(i));
-				enqueueChunkSectionLightingData(
+				enqueueSectionData(
 						LightType.SKY, chunkSectionPosition, getChunkLightingView(LightType.SKY).getLightSection(chunkSectionPosition));
-				enqueueChunkSectionLightingData(
+				enqueueSectionData(
 						LightType.BLOCK, chunkSectionPosition, getChunkLightingView(LightType.BLOCK).getLightSection(chunkSectionPosition));
 				setSectionStatus(chunkSectionPosition, false);
 			}
 
 			setColumnEnabled(chunkPosition, retainLightingData);
-			setRetainLightingData(chunkPosition, false);
+			setRetainData(chunkPosition, false);
 			return chunk;
 		}, threadPoolExecutor);
 	}

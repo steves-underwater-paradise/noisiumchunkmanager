@@ -86,10 +86,15 @@ public abstract class SkyLightStorageMixin extends LightStorage<SkyLightStorage.
 		private int noisiumchunkmanager$columnToTopSectionDefaultReturnValue;
 
 		@Inject(method = "<init>", at = @At(value = "TAIL"))
-		private void noisiumchunkmanager$replaceSets(@NotNull Long2ObjectOpenHashMap<Object> arrays, @Nullable Long2IntOpenHashMap columnToTopSection, int minSectionY, @NotNull CallbackInfo ci) {
+		private void noisiumchunkmanager$replaceSets(@NotNull Long2ObjectOpenHashMap<Object> arrays, @NotNull Long2IntOpenHashMap columnToTopSection, int minSectionY, @NotNull CallbackInfo ci) {
 			noisiumchunkmanager$columnToTopSection = new ConcurrentHashMap<>();
 			noisiumchunkmanager$columnToTopSectionDefaultReturnValue = minSectionY;
 
+			if (this.columnToTopSection == null) {
+				return;
+			}
+
+			noisiumchunkmanager$columnToTopSection.putAll(this.columnToTopSection);
 			this.columnToTopSection = null;
 		}
 

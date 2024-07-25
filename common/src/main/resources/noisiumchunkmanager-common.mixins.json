@@ -28,7 +28,6 @@
     "world.WorldMixin",
     "world.chunk.ChunkToNibbleArrayMapMixin",
     "world.chunk.PalettedContainerMixin",
-    "world.chunk.ProtoChunkMixin",
     "world.chunk.WorldChunkMixin",
     "world.chunk.light.BlockLightStorageDataMixin",
     "world.chunk.light.ChunkLightProviderMixin",
