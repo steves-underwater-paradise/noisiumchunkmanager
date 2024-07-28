@@ -70,6 +70,9 @@ public abstract class ServerWorldMixin implements ServerWorldExtension {
 	@Shadow
 	public abstract @NotNull List<ServerPlayerEntity> getPlayers();
 
+	/**
+	 * Keeps a reference to this {@link ServerWorld}'s {@link NoiseConfig}, to make sure it doesn't get garbage collected until the object is no longer necessary.
+	 */
 	@Unique
 	private NoiseConfig noisiumchunkmanager$noiseConfig;
 	/**

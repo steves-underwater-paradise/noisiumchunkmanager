@@ -96,8 +96,8 @@ public abstract class ServerChunkManagerMixin {
 		ci.cancel();
 	}
 
-	@Inject(method = "close", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ThreadedAnvilChunkStorage;close()V", shift = At.Shift.BEFORE), cancellable = true)
-	private void noisiumchunkmanager$cancelRemoveThreadedAnvilChunkStorageClose(@NotNull CallbackInfo ci) {
+	@Inject(method = "close", at = @At(value = "HEAD"), cancellable = true)
+	private void noisiumchunkmanager$cancelClose(@NotNull CallbackInfo ci) {
 		ci.cancel();
 	}
 

@@ -19,7 +19,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -72,6 +71,9 @@ public abstract class LightStorageMixin implements LightStorageExtension {
 	@Shadow
 	protected abstract @Nullable ChunkNibbleArray getLightSection(long sectionPos, boolean cached);
 
+	@Shadow
+	protected abstract void onUnloadSection(long sectionPos);
+
 	@Unique
 	private Map<Long, Byte> noisiumchunkmanager$sectionPropagations;
 	@Unique
@@ -104,6 +106,24 @@ public abstract class LightStorageMixin implements LightStorageExtension {
 		this.enabledColumns = null;
 		this.columnsToRetain = null;
 		this.sectionsToRemove = null;
+	}
+
+	/**
+	 * @author Steveplays28
+	 * @reason Add a {@code null} check.
+	 */
+	@Overwrite
+	public int get(long blockPosition) {
+		@Nullable var chunkNibbleArray = this.getLightSection(ChunkSectionPos.fromBlockPos(blockPosition), true);
+		if (chunkNibbleArray == null) {
+			return 0;
+		}
+
+		return chunkNibbleArray.get(
+				ChunkSectionPos.getLocalCoord(BlockPos.unpackLongX(blockPosition)),
+				ChunkSectionPos.getLocalCoord(BlockPos.unpackLongY(blockPosition)),
+				ChunkSectionPos.getLocalCoord(BlockPos.unpackLongZ(blockPosition))
+		);
 	}
 
 	/**
@@ -232,7 +252,7 @@ public abstract class LightStorageMixin implements LightStorageExtension {
 		};
 	}
 
-	@Inject(method = "updateLight", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/chunk/ChunkToNibbleArrayMap;clearCache()V", shift = At.Shift.BEFORE))
+	@Inject(method = "updateLight", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/chunk/ChunkToNibbleArrayMap;clearCache()V", ordinal = 1, shift = At.Shift.BEFORE))
 	private void noisiumchunkmanager$iterateOverQueuedSectionsThreadSafe(@NotNull ChunkLightProvider<?, ?> chunkLightProvider, @NotNull CallbackInfo ci) {
 		for (var queuedSectionsIterator = noisiumchunkmanager$queuedSections.entrySet().iterator(); queuedSectionsIterator.hasNext(); ) {
 			var queuedSectionEntry = queuedSectionsIterator.next();
@@ -296,30 +316,50 @@ public abstract class LightStorageMixin implements LightStorageExtension {
 	}
 
 	@Redirect(method = "updateLight", at = @At(value = "INVOKE", target = "Lit/unimi/dsi/fastutil/longs/LongSet;iterator()Lit/unimi/dsi/fastutil/longs/LongIterator;"))
-	private @NotNull LongIterator noisiumchunkmanager$getSectionsToRemoveIteratorThreadSafe(@Nullable LongSet instance) {
+	private @NotNull LongIterator noisiumchunkmanager$preventIteratingOverSectionsToRemoveThreadUnsafely(@Nullable LongSet instance) {
 		return new LongIterator() {
-			private final @NotNull Iterator<Long> iterator = noisiumchunkmanager$sectionsToRemove.iterator();
-
 			@Override
 			public boolean hasNext() {
-				return iterator.hasNext();
+				return false;
 			}
 
 			@Override
 			public long nextLong() {
-				return iterator.next();
-			}
-
-			@Override
-			public void forEachRemaining(@NotNull java.util.function.LongConsumer action) {
-				iterator.forEachRemaining(action::accept);
-			}
-
-			@Override
-			public void forEachRemaining(@NotNull it.unimi.dsi.fastutil.longs.LongConsumer action) {
-				iterator.forEachRemaining(action);
+				return 0;
 			}
 		};
+	}
+
+	@SuppressWarnings("ForLoopReplaceableByForEach")
+	@Inject(method = "updateLight", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/chunk/ChunkToNibbleArrayMap;clearCache()V", ordinal = 0))
+	private void noisiumchunkmanager$iterateOverSectionsToRemoveThreadSafe(@NotNull ChunkLightProvider<?, ?> lightProvider, @NotNull CallbackInfo ci) {
+		for (var sectionsToRemoveIterator = noisiumchunkmanager$sectionsToRemove.iterator(); sectionsToRemoveIterator.hasNext(); ) {
+			var sectionToRemove = sectionsToRemoveIterator.next();
+			var queuedChunkNibbleArray = noisiumchunkmanager$getQueuedSections().remove(sectionToRemove);
+			var chunkNibbleArray = this.storage.removeChunk(sectionToRemove);
+			if (!noisiumchunkmanager$columnsToRetain.contains(ChunkSectionPos.withZeroY(sectionToRemove))) {
+				continue;
+			}
+			if (queuedChunkNibbleArray != null) {
+				noisiumchunkmanager$getQueuedSections().put(sectionToRemove, queuedChunkNibbleArray);
+				continue;
+			}
+			if (chunkNibbleArray == null) {
+				continue;
+			}
+
+			noisiumchunkmanager$getQueuedSections().put(sectionToRemove, chunkNibbleArray);
+		}
+	}
+
+	@SuppressWarnings("ForLoopReplaceableByForEach")
+	@Inject(method = "updateLight", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/chunk/ChunkToNibbleArrayMap;clearCache()V", ordinal = 0, shift = At.Shift.AFTER))
+	private void noisiumchunkmanager$unloadSectionsToRemoveThreadSafe(@NotNull ChunkLightProvider<?, ?> lightProvider, @NotNull CallbackInfo ci) {
+		for (var sectionsToRemoveIterator = noisiumchunkmanager$sectionsToRemove.iterator(); sectionsToRemoveIterator.hasNext(); ) {
+			var sectionToRemove = sectionsToRemoveIterator.next();
+			this.onUnloadSection(sectionToRemove);
+			noisiumchunkmanager$dirtySections.add(sectionToRemove);
+		}
 	}
 
 	@Redirect(method = "updateLight", at = @At(value = "INVOKE", target = "Lit/unimi/dsi/fastutil/longs/LongSet;clear()V"))

@@ -20,7 +20,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 public class ChunkSerializerMixin {
 	@Redirect(method = "serialize", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/chunk/light/LightingProvider;getBottomY()I"))
 	private static int noisiumchunkmanager$getBottomYFromServerWorld(@Nullable LightingProvider instance, @Local(ordinal = 0, argsOnly = true) @NotNull ServerWorld serverWorld) {
-		return serverWorld.getBottomY() - 1;
+		return serverWorld.getBottomSectionCoord() - 1;
 	}
 
 	@Redirect(method = "serialize", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/chunk/light/LightingProvider;getTopY()I"))

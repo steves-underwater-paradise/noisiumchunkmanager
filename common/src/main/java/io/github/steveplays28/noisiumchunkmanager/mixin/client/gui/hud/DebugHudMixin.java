@@ -19,12 +19,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(DebugHud.class)
 public abstract class DebugHudMixin {
 	@Shadow
-	@Nullable
-	protected abstract ServerWorld getServerWorld();
+	protected abstract @Nullable ServerWorld getServerWorld();
 
 	@Shadow
-	@Nullable
-	private ChunkPos pos;
+	private @Nullable ChunkPos pos;
 
 	@Inject(method = "getChunk", at = @At(value = "HEAD"), cancellable = true)
 	private void noisiumchunkmanager$getChunkFromNoisiumServerWorldChunkManager(CallbackInfoReturnable<WorldChunk> cir) {
@@ -41,6 +39,6 @@ public abstract class DebugHudMixin {
 			return;
 		}
 
-		noisiumServerWorldChunkManager.getChunk(playerChunkPosition);
+		cir.setReturnValue(noisiumServerWorldChunkManager.getChunk(playerChunkPosition));
 	}
 }

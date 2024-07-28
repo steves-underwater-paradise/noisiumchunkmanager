@@ -1,6 +1,5 @@
 package io.github.steveplays28.noisiumchunkmanager.server.packet.world.lighting.data;
 
-import com.google.common.collect.Lists;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
@@ -9,6 +8,7 @@ import net.minecraft.world.chunk.light.ChunkLightProvider;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
 
@@ -25,8 +25,8 @@ public class ServerWorldLightData {
 		this.initializedBlockLight = new BitSet();
 		this.uninitializedSkyLight = new BitSet();
 		this.uninitializedBlockLight = new BitSet();
-		this.skyLightNibbles = Lists.newArrayList();
-		this.blockLightNibbles = Lists.newArrayList();
+		this.skyLightNibbles = new ArrayList<>();
+		this.blockLightNibbles = new ArrayList<>();
 
 		for (int positionY = 0; positionY < chunkHeight; ++positionY) {
 			if (skyLightBits == null || skyLightBits.get(positionY)) {

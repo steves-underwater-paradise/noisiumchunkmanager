@@ -52,7 +52,6 @@ import static io.github.steveplays28.noisiumchunkmanager.NoisiumChunkManager.MOD
  */
 // TODO: Fix canTickBlockEntities() check
 //  The check needs to be changed to point to the server world's isChunkLoaded() method
-// TODO: Implement chunk ticking
 // TODO: Save all chunks when save event is called
 public class ServerWorldChunkManager {
 	private final ServerWorld serverWorld;
@@ -143,7 +142,6 @@ public class ServerWorldChunkManager {
 		var worldChunkCompletableFuture = CompletableFuture.supplyAsync(() -> {
 			var fetchedNbtData = getNbtDataAtChunkPosition(chunkPos);
 			if (fetchedNbtData == null) {
-				// TODO: Schedule ProtoChunk worldgen and update loadedWorldChunks incrementally during worldgen steps
 				return new WorldChunk(
 						serverWorld,
 						generateChunk(
@@ -171,15 +169,16 @@ public class ServerWorldChunkManager {
 			syncRunnableConsumer.accept(() -> fetchedWorldChunk.addChunkTickSchedulers(serverWorld));
 			fetchedWorldChunk.loadEntities();
 			loadingWorldChunks.remove(chunkPos);
-
-			if (!unloadingWorldChunks.contains(chunkPos)) {
-				loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
-			}
-
+			loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
 			syncRunnableConsumer.accept(
 					() -> ServerChunkEvent.WORLD_CHUNK_LOADED.invoker().onWorldChunkLoaded(serverWorld, fetchedWorldChunk));
-			unloadingWorldChunks.remove(chunkPos);
-			syncRunnableConsumer.accept(() -> ServerChunkEvent.WORLD_CHUNK_UNLOADED.invoker().onWorldChunkUnloaded(serverWorld, chunkPos));
+
+			if (unloadingWorldChunks.contains(chunkPos)) {
+				loadedWorldChunks.remove(chunkPos);
+				unloadingWorldChunks.remove(chunkPos);
+				syncRunnableConsumer.accept(
+						() -> ServerChunkEvent.WORLD_CHUNK_UNLOADED.invoker().onWorldChunkUnloaded(serverWorld, chunkPos));
+			}
 		});
 		loadingWorldChunks.put(chunkPos, worldChunkCompletableFuture);
 		return worldChunkCompletableFuture;
@@ -206,7 +205,6 @@ public class ServerWorldChunkManager {
 
 		var fetchedNbtData = getNbtDataAtChunkPosition(chunkPos);
 		if (fetchedNbtData == null) {
-			// TODO: Schedule ProtoChunk worldgen and update loadedWorldChunks incrementally during worldgen steps
 			var fetchedWorldChunk = new WorldChunk(
 					serverWorld,
 					generateChunk(
@@ -215,14 +213,17 @@ public class ServerWorldChunkManager {
 					),
 					null
 			);
-			if (!unloadingWorldChunks.contains(chunkPos)) {
-				loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
-			}
-
+			loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
 			syncRunnableConsumer.accept(
 					() -> ServerChunkEvent.WORLD_CHUNK_LOADED.invoker().onWorldChunkLoaded(serverWorld, fetchedWorldChunk));
-			unloadingWorldChunks.remove(chunkPos);
-			syncRunnableConsumer.accept(() -> ServerChunkEvent.WORLD_CHUNK_UNLOADED.invoker().onWorldChunkUnloaded(serverWorld, chunkPos));
+
+			if (unloadingWorldChunks.contains(chunkPos)) {
+				loadedWorldChunks.remove(chunkPos);
+				unloadingWorldChunks.remove(chunkPos);
+				syncRunnableConsumer.accept(
+						() -> ServerChunkEvent.WORLD_CHUNK_UNLOADED.invoker().onWorldChunkUnloaded(serverWorld, chunkPos));
+			}
+
 			return fetchedWorldChunk;
 		}
 
@@ -233,13 +234,17 @@ public class ServerWorldChunkManager {
 		syncRunnableConsumer.accept(() -> fetchedWorldChunk.addChunkTickSchedulers(serverWorld));
 		fetchedWorldChunk.loadEntities();
 
-		if (!unloadingWorldChunks.contains(chunkPos)) {
-			loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
+		loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
+		syncRunnableConsumer.accept(
+				() -> ServerChunkEvent.WORLD_CHUNK_LOADED.invoker().onWorldChunkLoaded(serverWorld, fetchedWorldChunk));
+
+		if (unloadingWorldChunks.contains(chunkPos)) {
+			loadedWorldChunks.remove(chunkPos);
+			unloadingWorldChunks.remove(chunkPos);
+			syncRunnableConsumer.accept(
+					() -> ServerChunkEvent.WORLD_CHUNK_UNLOADED.invoker().onWorldChunkUnloaded(serverWorld, chunkPos));
 		}
 
-		syncRunnableConsumer.accept(() -> ServerChunkEvent.WORLD_CHUNK_LOADED.invoker().onWorldChunkLoaded(serverWorld, fetchedWorldChunk));
-		unloadingWorldChunks.remove(chunkPos);
-		syncRunnableConsumer.accept(() -> ServerChunkEvent.WORLD_CHUNK_UNLOADED.invoker().onWorldChunkUnloaded(serverWorld, chunkPos));
 		return fetchedWorldChunk;
 	}
 

@@ -57,10 +57,11 @@ public interface ServerChunkEvent {
 		/**
 		 * Invoked before a {@link WorldChunk} has had a light update processed by {@link ServerWorldChunkManager}.
 		 *
+		 * @param serverWorld          The {@link ServerWorld} of the unloaded {@link WorldChunk}.
 		 * @param lightType            The {@link LightType} of the {@link WorldChunk}.
 		 * @param chunkSectionPosition The {@link ChunkSectionPos} of the {@link WorldChunk}.
 		 */
-		void onLightUpdate(@NotNull LightType lightType, @NotNull ChunkSectionPos chunkSectionPosition);
+		void onLightUpdate(@NotNull ServerWorld serverWorld, @NotNull LightType lightType, @NotNull ChunkSectionPos chunkSectionPosition);
 	}
 
 	@FunctionalInterface

@@ -40,8 +40,13 @@ public class ServerWorldLightingProvider extends LightingProvider {
 			}
 
 			@Override
-			public BlockView getWorld() {
+			public @NotNull BlockView getWorld() {
 				return serverWorld;
+			}
+
+			@Override
+			public void onLightUpdate(@NotNull LightType lightType, @NotNull ChunkSectionPos chunkSectionPosition) {
+				ServerChunkEvent.LIGHT_UPDATE.invoker().onLightUpdate(serverWorld, lightType, chunkSectionPosition);
 			}
 		}, true, true);
 		this.serverWorld = serverWorld;
@@ -52,7 +57,13 @@ public class ServerWorldLightingProvider extends LightingProvider {
 						"Noisium Server World Lighting Provider " + serverWorld.getDimension().effects() + " %d").build()
 		);
 
-		ServerChunkEvent.LIGHT_UPDATE.register(this::onLightUpdateAsync);
+		ServerChunkEvent.LIGHT_UPDATE.register((instance, lightType, chunkSectionPosition) -> {
+			if (instance != serverWorld) {
+				return;
+			}
+
+			onLightUpdateAsync(lightType, chunkSectionPosition);
+		});
 		TickEvent.SERVER_LEVEL_POST.register(instance -> {
 			if (instance != serverWorld) {
 				return;
@@ -172,9 +183,9 @@ public class ServerWorldLightingProvider extends LightingProvider {
 	 * @param chunkSectionPosition The {@link ChunkSectionPos} of the {@link WorldChunk}.
 	 */
 	private void onLightUpdateAsync(@NotNull LightType lightType, @NotNull ChunkSectionPos chunkSectionPosition) {
-		int bottomY = serverWorld.getBottomY();
+		int bottomY = serverWorld.getBottomSectionCoord() - 1;
 		var chunkSectionYPosition = chunkSectionPosition.getSectionY();
-		if (chunkSectionYPosition < bottomY || chunkSectionYPosition > serverWorld.getTopY()) {
+		if (chunkSectionYPosition < bottomY || chunkSectionYPosition > serverWorld.countVerticalSections() + 2) {
 			return;
 		}
 
