@@ -1,20 +1,12 @@
 package io.github.steveplays28.noisiumchunkmanager.mixin.world.chunk;
 
-import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import io.github.steveplays28.noisiumchunkmanager.extension.world.chunk.WorldChunkExtension;
-import io.github.steveplays28.noisiumchunkmanager.server.extension.world.ServerWorldExtension;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.WorldChunk;
-import net.minecraft.world.chunk.light.LightingProvider;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
-import org.spongepowered.asm.mixin.injection.At;
 
 import java.util.BitSet;
 
@@ -36,26 +28,5 @@ public abstract class WorldChunkMixin implements WorldChunkExtension {
 	@Override
 	public @NotNull BitSet noisiumchunkmanager$getSkyLightBits() {
 		return noisiumchunkmanager$skyLightBits;
-	}
-
-	@WrapOperation(method = "setBlockState", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/chunk/light/LightingProvider;setSectionStatus(Lnet/minecraft/util/math/BlockPos;Z)V"))
-	private void noisiumchunkmanager$redirectSetSectionStatusToServerWorldLightingProvider(@Nullable LightingProvider instance, @NotNull BlockPos blockPosition, boolean notReady, @NotNull Operation<Void> original) {
-		if (getWorld() instanceof ServerWorld serverWorld) {
-			((ServerWorldExtension) serverWorld).noisiumchunkmanager$getServerWorldLightingProvider().setSectionStatus(
-					blockPosition, notReady);
-			return;
-		}
-
-		original.call(instance, blockPosition, notReady);
-	}
-
-	@WrapOperation(method = "setBlockState", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/chunk/light/LightingProvider;checkBlock(Lnet/minecraft/util/math/BlockPos;)V"))
-	private void noisiumchunkmanager$redirectCheckBlockToServerWorldLightingProvider(@Nullable LightingProvider instance, @NotNull BlockPos blockPosition, @NotNull Operation<Void> original) {
-		if (getWorld() instanceof ServerWorld serverWorld) {
-			((ServerWorldExtension) serverWorld).noisiumchunkmanager$getServerWorldLightingProvider().checkBlock(blockPosition);
-			return;
-		}
-
-		original.call(instance, blockPosition);
 	}
 }

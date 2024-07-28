@@ -75,13 +75,13 @@ public abstract class ServerChunkManagerMixin {
 	private StructurePlacementCalculator noisiumchunkmanager$structurePlacementCalculator;
 
 	@Inject(method = "<init>", at = @At(value = "TAIL"))
-	private void noisiumchunkmanager$constructorInject(ServerWorld world, LevelStorage.Session session, DataFixer dataFixer, StructureTemplateManager structureTemplateManager, Executor workerExecutor, @NotNull ChunkGenerator chunkGenerator, int viewDistance, int simulationDistance, boolean dsync, WorldGenerationProgressListener worldGenerationProgressListener, ChunkStatusChangeListener chunkStatusChangeListener, Supplier<PersistentStateManager> persistentStateManagerFactory, CallbackInfo ci) {
+	private void noisiumchunkmanager$constructorInject(@NotNull ServerWorld serverWorld, LevelStorage.Session session, DataFixer dataFixer, StructureTemplateManager structureTemplateManager, Executor workerExecutor, @NotNull ChunkGenerator chunkGenerator, int viewDistance, int simulationDistance, boolean dsync, WorldGenerationProgressListener worldGenerationProgressListener, ChunkStatusChangeListener chunkStatusChangeListener, Supplier<PersistentStateManager> persistentStateManagerFactory, CallbackInfo ci) {
 		noisiumchunkmanager$chunkGenerator = chunkGenerator;
 		noisiumchunkmanager$structurePlacementCalculator = this.getChunkGenerator().createStructurePlacementCalculator(
 				this.getWorld().getRegistryManager().getWrapperOrThrow(RegistryKeys.STRUCTURE_SET), this.getNoiseConfig(),
 				((ServerWorld) this.getWorld()).getSeed()
 		);
-		this.lightingProvider = null;
+		this.lightingProvider = (ServerLightingProvider) serverWorld.getLightingProvider();
 		this.threadedAnvilChunkStorage = null;
 	}
 

@@ -8,7 +8,6 @@ import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkStatus;
-import net.minecraft.world.chunk.light.LightingProvider;
 import org.jetbrains.annotations.NotNull;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -20,15 +19,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class WorldMixin {
 	@Shadow
 	public abstract boolean isClient();
-
-	@Inject(method = "getLightingProvider", at = @At(value = "RETURN"), cancellable = true)
-	private void noisiumchunkmanager$getServerWorldLightingProvider(@NotNull CallbackInfoReturnable<LightingProvider> cir) {
-		if (this.isClient()) {
-			return;
-		}
-
-		cir.setReturnValue(((ServerWorldExtension) this).noisiumchunkmanager$getServerWorldLightingProvider());
-	}
 
 	@Inject(method = "getChunk(IILnet/minecraft/world/chunk/ChunkStatus;Z)Lnet/minecraft/world/chunk/Chunk;", at = @At(value = "HEAD"), cancellable = true)
 	private void noisiumchunkmanager$getChunkFromNoisiumServerChunkManager(int chunkPositionX, int chunkPositionZ, @NotNull ChunkStatus leastStatus, boolean create, @NotNull CallbackInfoReturnable<Chunk> cir) {

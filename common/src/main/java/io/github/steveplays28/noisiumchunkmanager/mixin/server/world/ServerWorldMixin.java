@@ -12,12 +12,15 @@ import io.github.steveplays28.noisiumchunkmanager.util.networking.packet.PacketU
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
 import net.minecraft.network.packet.Packet;
+import net.minecraft.registry.DynamicRegistryManager;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.WorldGenerationProgressListener;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ChunkLevelType;
+import net.minecraft.server.world.ServerChunkManager;
 import net.minecraft.server.world.ServerEntityManager;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
@@ -25,10 +28,13 @@ import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.random.RandomSequencesState;
 import net.minecraft.util.profiler.Profiler;
 import net.minecraft.world.LightType;
+import net.minecraft.world.MutableWorldProperties;
 import net.minecraft.world.PersistentStateManager;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.world.chunk.light.LightingProvider;
 import net.minecraft.world.dimension.DimensionOptions;
+import net.minecraft.world.dimension.DimensionType;
 import net.minecraft.world.gen.chunk.ChunkGenerator;
 import net.minecraft.world.gen.chunk.ChunkGeneratorSettings;
 import net.minecraft.world.gen.chunk.NoiseChunkGenerator;
@@ -50,10 +56,17 @@ import io.github.steveplays28.noisiumchunkmanager.server.event.world.chunk.Serve
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.function.Supplier;
 
-@Debug(export = true)
 @Mixin(ServerWorld.class)
-public abstract class ServerWorldMixin implements ServerWorldExtension {
+public abstract class ServerWorldMixin extends World implements ServerWorldExtension {
+	protected ServerWorldMixin(MutableWorldProperties properties, RegistryKey<World> registryRef, DynamicRegistryManager registryManager, RegistryEntry<DimensionType> dimensionEntry, Supplier<Profiler> profiler, boolean isClient, boolean debugWorld, long biomeAccess, int maxChainedNeighborUpdates) {
+		super(
+				properties, registryRef, registryManager, dimensionEntry, profiler, isClient, debugWorld, biomeAccess,
+				maxChainedNeighborUpdates
+		);
+	}
+
 	@Shadow
 	@Final
 	private ServerEntityManager<Entity> entityManager;
@@ -70,22 +83,25 @@ public abstract class ServerWorldMixin implements ServerWorldExtension {
 	@Shadow
 	public abstract @NotNull List<ServerPlayerEntity> getPlayers();
 
+	@Shadow
+	public abstract ServerChunkManager getChunkManager();
+
 	/**
 	 * Keeps a reference to this {@link ServerWorld}'s {@link NoiseConfig}, to make sure it doesn't get garbage collected until the object is no longer necessary.
 	 */
 	@Unique
 	private NoiseConfig noisiumchunkmanager$noiseConfig;
 	/**
-	 * Keeps a reference to this {@link ServerWorld}'s {@link ServerWorldChunkManager}, to make sure it doesn't get garbage collected until the object is no longer necessary.
-	 */
-	@Unique
-	private ServerWorldChunkManager noisiumchunkmanager$serverWorldChunkManager;
-	/**
 	 * Keeps a reference to this {@link ServerWorld}'s {@link ServerWorldLightingProvider}, to make sure it doesn't get garbage collected until the object is no longer necessary.
 	 */
 	@SuppressWarnings("unused")
 	@Unique
 	private ServerWorldLightingProvider noisiumchunkmanager$serverWorldLightingProvider;
+	/**
+	 * Keeps a reference to this {@link ServerWorld}'s {@link ServerWorldChunkManager}, to make sure it doesn't get garbage collected until the object is no longer necessary.
+	 */
+	@Unique
+	private ServerWorldChunkManager noisiumchunkmanager$serverWorldChunkManager;
 	/**
 	 * Keeps a reference to this {@link ServerWorld}'s {@link ServerWorldTicketTracker}, to make sure it doesn't get garbage collected until the object is no longer necessary.
 	 */
@@ -111,6 +127,7 @@ public abstract class ServerWorldMixin implements ServerWorldExtension {
 	@Unique
 	private ServerWorldPlayerChunkLoader noisiumchunkmanager$serverWorldPlayerChunkLoader;
 
+	@SuppressWarnings("resource")
 	@Inject(method = "<init>", at = @At(value = "INVOKE_ASSIGN", target = "Lnet/minecraft/server/MinecraftServer;getDataFixer()Lcom/mojang/datafixers/DataFixer;", shift = At.Shift.AFTER))
 	private void noisiumchunkmanager$constructorCreateServerWorldChunkManager(@NotNull MinecraftServer server, Executor workerExecutor, @NotNull LevelStorage.Session session, @NotNull ServerWorldProperties serverWorldProperties, @NotNull RegistryKey<World> worldKey, @NotNull DimensionOptions dimensionOptions, WorldGenerationProgressListener worldGenerationProgressListener, boolean debugWorld, long seed, List<?> spawners, boolean shouldTickTime, RandomSequencesState randomSequencesState, @NotNull CallbackInfo ci, @Local @NotNull DataFixer dataFixer) {
 		@SuppressWarnings("DataFlowIssue")
@@ -142,8 +159,8 @@ public abstract class ServerWorldMixin implements ServerWorldExtension {
 		noisiumchunkmanager$serverWorldEntityManager = new ServerWorldEntityTracker(
 				packet -> PacketUtil.sendPacketToPlayers(serverWorld.getPlayers(), packet));
 		noisiumchunkmanager$serverWorldPlayerChunkLoader = new ServerWorldPlayerChunkLoader(
-				serverWorld, () -> noisiumchunkmanager$serverWorldLightingProvider.getChunkLightingView(LightType.SKY),
-				() -> noisiumchunkmanager$serverWorldLightingProvider.getChunkLightingView(LightType.BLOCK),
+				serverWorld, () -> noisiumchunkmanager$getServerWorldLightingProvider().get(LightType.SKY),
+				() -> noisiumchunkmanager$getServerWorldLightingProvider().get(LightType.BLOCK),
 				noisiumchunkmanager$serverWorldChunkManager::getChunksInRadiusAsync,
 				noisiumchunkmanager$serverWorldChunkManager::getChunkAsync,
 				noisiumchunkmanager$serverWorldChunkManager::unloadChunk, server.getPlayerManager()::getViewDistance
@@ -217,6 +234,11 @@ public abstract class ServerWorldMixin implements ServerWorldExtension {
 	private void noisiumchunkmanager$redirectOnBlockChangedToNoisiumServerWorldChunkManager(BlockPos blockPos, BlockState oldBlockState, BlockState newBlockState, CallbackInfo ci) {
 		ServerChunkEvent.BLOCK_CHANGE.invoker().onBlockChange(blockPos, oldBlockState, newBlockState);
 		ci.cancel();
+	}
+
+	@Override
+	public LightingProvider getLightingProvider() {
+		return noisiumchunkmanager$getServerWorldLightingProvider();
 	}
 
 	@Override

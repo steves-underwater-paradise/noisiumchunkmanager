@@ -24,7 +24,6 @@
     "server.world.ThreadedAnvilChunkStorageMixin",
     "world.ChunkRegionMixin",
     "world.ChunkSectionCacheMixin",
-    "world.ChunkSerializerMixin",
     "world.WorldMixin",
     "world.chunk.ChunkToNibbleArrayMapMixin",
     "world.chunk.PalettedContainerMixin",
