@@ -2,11 +2,13 @@ package io.github.steveplays28.noisiumchunkmanager.server.world.lighting;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import dev.architectury.event.events.common.TickEvent;
+import io.github.steveplays28.noisiumchunkmanager.NoisiumChunkManager;
 import io.github.steveplays28.noisiumchunkmanager.config.NoisiumChunkManagerConfig;
 import io.github.steveplays28.noisiumchunkmanager.extension.world.chunk.WorldChunkExtension;
 import io.github.steveplays28.noisiumchunkmanager.server.event.world.chunk.ServerChunkEvent;
 import io.github.steveplays28.noisiumchunkmanager.server.extension.world.ServerWorldExtension;
 import io.github.steveplays28.noisiumchunkmanager.util.world.chunk.ChunkUtil;
+import net.minecraft.server.world.ChunkTicketType;
 import net.minecraft.server.world.ServerLightingProvider;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
@@ -16,6 +18,7 @@ import net.minecraft.world.BlockView;
 import net.minecraft.world.LightType;
 import net.minecraft.world.chunk.*;
 import net.minecraft.world.chunk.light.*;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -58,6 +61,22 @@ public class ServerWorldLightingProvider extends ServerLightingProvider {
 						"Noisium Server World Lighting Provider " + serverWorld.getDimension().effects() + " %d").build()
 		);
 
+		ServerChunkEvent.WORLD_CHUNK_LOADED.register((instance, worldChunk) -> {
+			if (!worldChunk.isLightOn()) {
+				@NotNull var worldChunkPosition = worldChunk.getPos();
+				instance.getChunkManager().addTicket(ChunkTicketType.LIGHT, worldChunkPosition, 1, worldChunkPosition);
+				initializeLight(worldChunk, false).thenCompose(chunkWithInitializedLighting ->
+						light(chunkWithInitializedLighting, false)).whenComplete((litChunk, throwable) -> {
+					if (throwable != null) {
+						NoisiumChunkManager.LOGGER.error(
+								"Exception thrown while lighting a chunk asynchronously:\n{}", ExceptionUtils.getStackTrace(throwable));
+						return;
+					}
+
+					instance.getChunkManager().removeTicket(ChunkTicketType.LIGHT, worldChunkPosition, 1, worldChunkPosition);
+				});
+			}
+		});
 		ServerChunkEvent.LIGHT_UPDATE.register((instance, lightType, chunkSectionPosition) -> {
 			if (instance != serverWorld) {
 				return;

@@ -61,6 +61,7 @@ public class ServerWorldChunkManager {
 	private final Supplier<LightingProvider> lightingProviderSupplier;
 	private final BiFunction<Chunk, Boolean, CompletableFuture<Chunk>> initializeChunkLightingBiFunction;
 	private final BiFunction<Chunk, Boolean, CompletableFuture<Chunk>> lightChunkBiFunction;
+	private final Function<ChunkPos, Boolean> hasTicketAtPositionSupplier;
 	private final PersistentStateManager persistentStateManager;
 	private final PointOfInterestStorage pointOfInterestStorage;
 	private final VersionedChunkStorage versionedChunkStorage;
@@ -74,7 +75,7 @@ public class ServerWorldChunkManager {
 	private boolean isStopping;
 
 	@SuppressWarnings("ResultOfMethodCallIgnored")
-	public ServerWorldChunkManager(@NotNull ServerWorld serverWorld, @NotNull ChunkGenerator chunkGenerator, @NotNull NoiseConfig noiseConfig, @NotNull Consumer<Runnable> syncRunnableConsumer, @NotNull Supplier<LightingProvider> lightingProviderSupplier, @NotNull BiFunction<Chunk, Boolean, CompletableFuture<Chunk>> initializeChunkLightingBiFunction, @NotNull BiFunction<Chunk, Boolean, CompletableFuture<Chunk>> lightChunkBiFunction, @NotNull Path worldDirectoryPath, @NotNull DataFixer dataFixer) {
+	public ServerWorldChunkManager(@NotNull ServerWorld serverWorld, @NotNull ChunkGenerator chunkGenerator, @NotNull NoiseConfig noiseConfig, @NotNull Consumer<Runnable> syncRunnableConsumer, @NotNull Supplier<LightingProvider> lightingProviderSupplier, @NotNull BiFunction<Chunk, Boolean, CompletableFuture<Chunk>> initializeChunkLightingBiFunction, @NotNull BiFunction<Chunk, Boolean, CompletableFuture<Chunk>> lightChunkBiFunction, @NotNull Function<ChunkPos, Boolean> hasTicketAtPositionSupplier, @NotNull Path worldDirectoryPath, @NotNull DataFixer dataFixer) {
 		this.serverWorld = serverWorld;
 		this.chunkGenerator = chunkGenerator;
 		this.noiseConfig = noiseConfig;
@@ -82,6 +83,7 @@ public class ServerWorldChunkManager {
 		this.lightingProviderSupplier = lightingProviderSupplier;
 		this.initializeChunkLightingBiFunction = initializeChunkLightingBiFunction;
 		this.lightChunkBiFunction = lightChunkBiFunction;
+		this.hasTicketAtPositionSupplier = hasTicketAtPositionSupplier;
 
 		var worldDataFile = worldDirectoryPath.resolve("data").toFile();
 		worldDataFile.mkdirs();
@@ -173,7 +175,7 @@ public class ServerWorldChunkManager {
 			syncRunnableConsumer.accept(
 					() -> ServerChunkEvent.WORLD_CHUNK_LOADED.invoker().onWorldChunkLoaded(serverWorld, fetchedWorldChunk));
 
-			if (unloadingWorldChunks.contains(chunkPos)) {
+			if (unloadingWorldChunks.contains(chunkPos) && !hasTicketAtPositionSupplier.apply(chunkPos)) {
 				loadedWorldChunks.remove(chunkPos);
 				unloadingWorldChunks.remove(chunkPos);
 				syncRunnableConsumer.accept(
@@ -217,7 +219,7 @@ public class ServerWorldChunkManager {
 			syncRunnableConsumer.accept(
 					() -> ServerChunkEvent.WORLD_CHUNK_LOADED.invoker().onWorldChunkLoaded(serverWorld, fetchedWorldChunk));
 
-			if (unloadingWorldChunks.contains(chunkPos)) {
+			if (unloadingWorldChunks.contains(chunkPos) && !hasTicketAtPositionSupplier.apply(chunkPos)) {
 				loadedWorldChunks.remove(chunkPos);
 				unloadingWorldChunks.remove(chunkPos);
 				syncRunnableConsumer.accept(
@@ -238,7 +240,7 @@ public class ServerWorldChunkManager {
 		syncRunnableConsumer.accept(
 				() -> ServerChunkEvent.WORLD_CHUNK_LOADED.invoker().onWorldChunkLoaded(serverWorld, fetchedWorldChunk));
 
-		if (unloadingWorldChunks.contains(chunkPos)) {
+		if (unloadingWorldChunks.contains(chunkPos) && !hasTicketAtPositionSupplier.apply(chunkPos)) {
 			loadedWorldChunks.remove(chunkPos);
 			unloadingWorldChunks.remove(chunkPos);
 			syncRunnableConsumer.accept(
@@ -449,13 +451,6 @@ public class ServerWorldChunkManager {
 		}
 
 		ioWorldChunkRemoveFunction.apply(chunkPos);
-
-		protoChunk.setStatus(ChunkStatus.INITIALIZE_LIGHT);
-		protoChunk.refreshSurfaceY();
-		initializeChunkLightingBiConsumer.apply(protoChunk, protoChunk.isLightOn()).join();
-
-		protoChunk.setStatus(ChunkStatus.LIGHT);
-		lightChunkBiConsumer.apply(protoChunk, protoChunk.isLightOn()).join();
 
 		protoChunk.setStatus(ChunkStatus.SPAWN);
 		chunkGenerator.populateEntities(chunkRegion);

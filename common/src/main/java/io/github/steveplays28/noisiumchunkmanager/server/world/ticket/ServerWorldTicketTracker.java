@@ -7,8 +7,8 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.ChunkPos;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -23,7 +23,7 @@ public class ServerWorldTicketTracker {
 		this.loadChunksInRadiusBiConsumer = loadChunksInRadiusBiConsumer;
 		this.unloadChunkConsumer = unloadChunkConsumer;
 
-		this.tickets = new HashMap<>();
+		this.tickets = new ConcurrentHashMap<>();
 
 		ServerWorldTicketEvent.TICKET_CREATED.register((ticketServerWorld, ticketType, chunkPosition, radius) -> {
 			if (ticketServerWorld != serverWorld) {
@@ -46,6 +46,10 @@ public class ServerWorldTicketTracker {
 
 			tick();
 		});
+	}
+
+	public boolean hasTicketAtPosition(@NotNull ChunkPos chunkPosition) {
+		return this.tickets.containsKey(chunkPosition);
 	}
 
 	private void onTicketCreated(@NotNull ServerWorld serverWorld, @NotNull ChunkTicketType<?> ticketType, @NotNull ChunkPos chunkPosition, int radius) {
