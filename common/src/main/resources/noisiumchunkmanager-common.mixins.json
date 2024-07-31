@@ -33,8 +33,6 @@
     "world.chunk.light.LightStorageMixin",
     "world.chunk.light.SkyLightStorageMixin",
     "world.chunk.light.SkyLightStorageMixin$DataMixin",
-    "world.gen.chunk.ChunkGeneratorMixin",
-    "world.gen.chunk.NoiseChunkGeneratorMixin",
     "world.gen.feature.OreFeatureMixin",
     "world.storage.SerializingRegionBasedStorageMixin"
   ],

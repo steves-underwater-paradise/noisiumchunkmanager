@@ -31,6 +31,8 @@ public class ServerWorldLightingProvider extends ServerLightingProvider {
 	private final @NotNull ServerWorld serverWorld;
 	private final @NotNull Executor threadPoolExecutor;
 
+	private CompletableFuture<Void> lightUpdatesFuture;
+
 	public ServerWorldLightingProvider(@NotNull ServerWorld serverWorld) {
 		super(new ChunkProvider() {
 			@Override
@@ -198,8 +200,6 @@ public class ServerWorldLightingProvider extends ServerLightingProvider {
 			var blockLightBits = worldChunkExtension.noisiumchunkmanager$getSkyLightBits();
 			int chunkSectionYPositionDifference = chunkSectionYPosition - bottomY;
 
-			skyLightBits.clear();
-			blockLightBits.clear();
 			if (lightType == LightType.SKY) {
 				skyLightBits.set(chunkSectionYPositionDifference);
 			} else {
@@ -210,6 +210,8 @@ public class ServerWorldLightingProvider extends ServerLightingProvider {
 					serverWorld.getBottomSectionCoord() - 1, skyLightProvider, blockLightProvider,
 					skyLightBits, blockLightBits
 			);
+			skyLightBits.clear();
+			blockLightBits.clear();
 		}, threadPoolExecutor);
 	}
 
@@ -219,7 +221,11 @@ public class ServerWorldLightingProvider extends ServerLightingProvider {
 	}
 
 	private void doLightUpdatesAsync() {
-		CompletableFuture.runAsync(() -> {
+		if (!hasUpdates() || (lightUpdatesFuture != null && !lightUpdatesFuture.isDone())) {
+			return;
+		}
+
+		lightUpdatesFuture = CompletableFuture.runAsync(() -> {
 			blockLightProvider.doLightUpdates();
 			skyLightProvider.doLightUpdates();
 		}, threadPoolExecutor);
