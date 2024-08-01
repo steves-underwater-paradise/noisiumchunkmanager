@@ -39,7 +39,6 @@ import org.jetbrains.annotations.Nullable;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -59,9 +58,7 @@ public class ServerWorldChunkManager {
 	private final NoiseConfig noiseConfig;
 	private final Consumer<Runnable> syncRunnableConsumer;
 	private final Supplier<LightingProvider> lightingProviderSupplier;
-	private final BiFunction<Chunk, Boolean, CompletableFuture<Chunk>> initializeChunkLightingBiFunction;
-	private final BiFunction<Chunk, Boolean, CompletableFuture<Chunk>> lightChunkBiFunction;
-	private final Function<ChunkPos, Boolean> hasTicketAtPositionSupplier;
+	private final Function<ChunkPos, Boolean> hasTicketAtPositionFunction;
 	private final PersistentStateManager persistentStateManager;
 	private final PointOfInterestStorage pointOfInterestStorage;
 	private final VersionedChunkStorage versionedChunkStorage;
@@ -75,15 +72,13 @@ public class ServerWorldChunkManager {
 	private boolean isStopping;
 
 	@SuppressWarnings("ResultOfMethodCallIgnored")
-	public ServerWorldChunkManager(@NotNull ServerWorld serverWorld, @NotNull ChunkGenerator chunkGenerator, @NotNull NoiseConfig noiseConfig, @NotNull Consumer<Runnable> syncRunnableConsumer, @NotNull Supplier<LightingProvider> lightingProviderSupplier, @NotNull BiFunction<Chunk, Boolean, CompletableFuture<Chunk>> initializeChunkLightingBiFunction, @NotNull BiFunction<Chunk, Boolean, CompletableFuture<Chunk>> lightChunkBiFunction, @NotNull Function<ChunkPos, Boolean> hasTicketAtPositionSupplier, @NotNull Path worldDirectoryPath, @NotNull DataFixer dataFixer) {
+	public ServerWorldChunkManager(@NotNull ServerWorld serverWorld, @NotNull ChunkGenerator chunkGenerator, @NotNull NoiseConfig noiseConfig, @NotNull Consumer<Runnable> syncRunnableConsumer, @NotNull Supplier<LightingProvider> lightingProviderSupplier, @NotNull Function<ChunkPos, Boolean> hasTicketAtPositionFunction, @NotNull Path worldDirectoryPath, @NotNull DataFixer dataFixer) {
 		this.serverWorld = serverWorld;
 		this.chunkGenerator = chunkGenerator;
 		this.noiseConfig = noiseConfig;
 		this.syncRunnableConsumer = syncRunnableConsumer;
 		this.lightingProviderSupplier = lightingProviderSupplier;
-		this.initializeChunkLightingBiFunction = initializeChunkLightingBiFunction;
-		this.lightChunkBiFunction = lightChunkBiFunction;
-		this.hasTicketAtPositionSupplier = hasTicketAtPositionSupplier;
+		this.hasTicketAtPositionFunction = hasTicketAtPositionFunction;
 
 		var worldDataFile = worldDirectoryPath.resolve("data").toFile();
 		worldDataFile.mkdirs();
@@ -145,13 +140,7 @@ public class ServerWorldChunkManager {
 			var fetchedNbtData = getNbtDataAtChunkPosition(chunkPos);
 			if (fetchedNbtData == null) {
 				return new WorldChunk(
-						serverWorld,
-						generateChunk(
-								chunkPos, lightingProviderSupplier, this::getIoWorldChunk, ioWorldChunks::remove,
-								initializeChunkLightingBiFunction, lightChunkBiFunction
-						),
-						null
-				);
+						serverWorld, generateChunk(chunkPos, lightingProviderSupplier, this::getIoWorldChunk, ioWorldChunks::remove), null);
 			}
 
 			versionedChunkStorage.updateChunkNbt(
@@ -175,7 +164,7 @@ public class ServerWorldChunkManager {
 			syncRunnableConsumer.accept(
 					() -> ServerChunkEvent.WORLD_CHUNK_LOADED.invoker().onWorldChunkLoaded(serverWorld, fetchedWorldChunk));
 
-			if (unloadingWorldChunks.contains(chunkPos) && !hasTicketAtPositionSupplier.apply(chunkPos)) {
+			if (unloadingWorldChunks.contains(chunkPos) && !hasTicketAtPositionFunction.apply(chunkPos)) {
 				loadedWorldChunks.remove(chunkPos);
 				unloadingWorldChunks.remove(chunkPos);
 				syncRunnableConsumer.accept(
@@ -208,18 +197,12 @@ public class ServerWorldChunkManager {
 		var fetchedNbtData = getNbtDataAtChunkPosition(chunkPos);
 		if (fetchedNbtData == null) {
 			var fetchedWorldChunk = new WorldChunk(
-					serverWorld,
-					generateChunk(
-							chunkPos, lightingProviderSupplier, this::getIoWorldChunk, ioWorldChunks::remove,
-							initializeChunkLightingBiFunction, lightChunkBiFunction
-					),
-					null
-			);
+					serverWorld, generateChunk(chunkPos, lightingProviderSupplier, this::getIoWorldChunk, ioWorldChunks::remove), null);
 			loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
 			syncRunnableConsumer.accept(
 					() -> ServerChunkEvent.WORLD_CHUNK_LOADED.invoker().onWorldChunkLoaded(serverWorld, fetchedWorldChunk));
 
-			if (unloadingWorldChunks.contains(chunkPos) && !hasTicketAtPositionSupplier.apply(chunkPos)) {
+			if (unloadingWorldChunks.contains(chunkPos) && !hasTicketAtPositionFunction.apply(chunkPos)) {
 				loadedWorldChunks.remove(chunkPos);
 				unloadingWorldChunks.remove(chunkPos);
 				syncRunnableConsumer.accept(
@@ -240,7 +223,7 @@ public class ServerWorldChunkManager {
 		syncRunnableConsumer.accept(
 				() -> ServerChunkEvent.WORLD_CHUNK_LOADED.invoker().onWorldChunkLoaded(serverWorld, fetchedWorldChunk));
 
-		if (unloadingWorldChunks.contains(chunkPos) && !hasTicketAtPositionSupplier.apply(chunkPos)) {
+		if (unloadingWorldChunks.contains(chunkPos) && !hasTicketAtPositionFunction.apply(chunkPos)) {
 			loadedWorldChunks.remove(chunkPos);
 			unloadingWorldChunks.remove(chunkPos);
 			syncRunnableConsumer.accept(
@@ -358,8 +341,8 @@ public class ServerWorldChunkManager {
 		return null;
 	}
 
-	// TODO: Move this into the constructor as a Supplier<ChunkPos, ProtoChunk>
-	private @NotNull ProtoChunk generateChunk(@NotNull ChunkPos chunkPos, @NotNull Supplier<LightingProvider> lightingProviderSupplier, @NotNull Function<ChunkPos, IoWorldChunk> ioWorldChunkGetFunction, @NotNull Function<ChunkPos, IoWorldChunk> ioWorldChunkRemoveFunction, @NotNull BiFunction<Chunk, Boolean, CompletableFuture<Chunk>> initializeChunkLightingBiConsumer, @NotNull BiFunction<Chunk, Boolean, CompletableFuture<Chunk>> lightChunkBiConsumer) {
+	// TODO: Move this into the constructor as a Function<ChunkPos, ProtoChunk>
+	private @NotNull ProtoChunk generateChunk(@NotNull ChunkPos chunkPos, @NotNull Supplier<LightingProvider> lightingProviderSupplier, @NotNull Function<ChunkPos, IoWorldChunk> ioWorldChunkGetFunction, @NotNull Function<ChunkPos, IoWorldChunk> ioWorldChunkRemoveFunction) {
 		var protoChunk = new ProtoChunk(chunkPos, UpgradeData.NO_UPGRADE_DATA, serverWorld,
 				serverWorld.getRegistryManager().get(RegistryKeys.BIOME), null
 		);

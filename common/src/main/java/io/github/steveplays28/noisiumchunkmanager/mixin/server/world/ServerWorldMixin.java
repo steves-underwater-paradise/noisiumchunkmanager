@@ -147,8 +147,6 @@ public abstract class ServerWorldMixin extends World implements ServerWorldExten
 		noisiumchunkmanager$serverWorldChunkManager = new ServerWorldChunkManager(
 				serverWorld, chunkGenerator, noisiumchunkmanager$noiseConfig, this.getServer()::executeSync,
 				this::noisiumchunkmanager$getServerWorldLightingProvider,
-				noisiumchunkmanager$getServerWorldLightingProvider()::initializeLight,
-				noisiumchunkmanager$getServerWorldLightingProvider()::light,
 				(chunkPosition) -> {
 					if (noisiumchunkmanager$serverWorldTicketTracker == null) {
 						return false;
