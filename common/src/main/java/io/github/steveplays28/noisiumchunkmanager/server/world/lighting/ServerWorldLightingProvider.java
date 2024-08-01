@@ -1,6 +1,7 @@
 package io.github.steveplays28.noisiumchunkmanager.server.world.lighting;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import dev.architectury.event.events.common.LifecycleEvent;
 import dev.architectury.event.events.common.TickEvent;
 import io.github.steveplays28.noisiumchunkmanager.NoisiumChunkManager;
 import io.github.steveplays28.noisiumchunkmanager.config.NoisiumChunkManagerConfig;
@@ -22,9 +23,13 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+
+import static io.github.steveplays28.noisiumchunkmanager.NoisiumChunkManager.MOD_NAME;
 
 /**
  * A lighting provider for {@link ServerWorld}s.
@@ -33,8 +38,10 @@ import java.util.concurrent.Executors;
 public class ServerWorldLightingProvider extends ServerLightingProvider {
 	private final @NotNull ServerWorld serverWorld;
 	private final @NotNull Executor threadPoolExecutor;
+	private final @NotNull List<CompletableFuture<Void>> lightChunkCompletableFutures;
 
-	private CompletableFuture<Void> lightUpdatesFuture;
+	private boolean isStopping;
+	private CompletableFuture<Void> lightUpdatesCompletableFuture;
 
 	public ServerWorldLightingProvider(@NotNull ServerWorld serverWorld) {
 		super(new ChunkProvider() {
@@ -60,36 +67,51 @@ public class ServerWorldLightingProvider extends ServerLightingProvider {
 				new ThreadFactoryBuilder().setNameFormat(
 						"Noisium Server World Lighting Provider " + serverWorld.getDimension().effects() + " %d").build()
 		);
+		this.lightChunkCompletableFutures = new ArrayList<>();
 
 		ServerChunkEvent.WORLD_CHUNK_LOADED.register((instance, worldChunk) -> {
-			if (!worldChunk.isLightOn()) {
-				@NotNull var worldChunkPosition = worldChunk.getPos();
-				instance.getChunkManager().addTicket(ChunkTicketType.LIGHT, worldChunkPosition, 1, worldChunkPosition);
-				initializeLight(worldChunk, false).thenCompose(chunkWithInitializedLighting ->
-						light(chunkWithInitializedLighting, false)).whenComplete((litChunk, throwable) -> {
-					if (throwable != null) {
-						NoisiumChunkManager.LOGGER.error(
-								"Exception thrown while lighting a chunk asynchronously:\n{}", ExceptionUtils.getStackTrace(throwable));
-						return;
-					}
-
-					instance.getChunkManager().removeTicket(ChunkTicketType.LIGHT, worldChunkPosition, 1, worldChunkPosition);
-				});
+			if (worldChunk.isLightOn() || instance.getPlayers().isEmpty() || isStopping) {
+				return;
 			}
+
+			@NotNull var worldChunkPosition = worldChunk.getPos();
+			// TODO: Change to a functional interface
+			instance.getChunkManager().addTicket(ChunkTicketType.LIGHT, worldChunkPosition, 2, worldChunkPosition);
+			initializeLight(worldChunk, false).thenCompose(chunkWithInitializedLighting ->
+					light(chunkWithInitializedLighting, false)).whenComplete((litChunk, throwable) -> {
+				if (throwable != null) {
+					NoisiumChunkManager.LOGGER.error(
+							"Exception thrown while lighting a chunk asynchronously:\n{}",
+							ExceptionUtils.getStackTrace(ExceptionUtils.getRootCause(throwable))
+					);
+					return;
+				}
+
+				// TODO: Change to a functional interface
+				instance.getChunkManager().removeTicket(ChunkTicketType.LIGHT, worldChunkPosition, 1, worldChunkPosition);
+			});
 		});
 		ServerChunkEvent.LIGHT_UPDATE.register((instance, lightType, chunkSectionPosition) -> {
-			if (instance != serverWorld) {
+			if (instance != serverWorld || isStopping) {
 				return;
 			}
 
 			onLightUpdateAsync(lightType, chunkSectionPosition);
 		});
 		TickEvent.SERVER_LEVEL_POST.register(instance -> {
-			if (instance != serverWorld) {
+			if (instance != serverWorld || instance.getPlayers().isEmpty() || isStopping) {
 				return;
 			}
 
 			tick();
+		});
+		LifecycleEvent.SERVER_STOPPING.register(instance -> {
+			this.isStopping = true;
+			for (var lightChunkCompletableFuture : lightChunkCompletableFutures) {
+				lightChunkCompletableFuture.cancel(true);
+			}
+
+			lightChunkCompletableFutures.clear();
 		});
 	}
 
@@ -160,6 +182,11 @@ public class ServerWorldLightingProvider extends ServerLightingProvider {
 
 	@Override
 	public @NotNull CompletableFuture<Chunk> initializeLight(@NotNull Chunk chunk, boolean retainLightingData) {
+		if (isStopping) {
+			return CompletableFuture.failedFuture(new IllegalStateException(
+					String.format("Can't initialise chunk lighting because %s Server World Lighting Provider is stopping.", MOD_NAME)));
+		}
+
 		return CompletableFuture.supplyAsync(() -> {
 			@NotNull var chunkPosition = chunk.getPos();
 			@NotNull var chunkSections = chunk.getSectionArray();
@@ -185,6 +212,11 @@ public class ServerWorldLightingProvider extends ServerLightingProvider {
 
 	@Override
 	public @NotNull CompletableFuture<Chunk> light(@NotNull Chunk chunk, boolean excludeBlocks) {
+		if (isStopping) {
+			return CompletableFuture.failedFuture(new IllegalStateException(
+					String.format("Can't light chunk because %s Server World Lighting Provider is stopping.", MOD_NAME)));
+		}
+
 		return CompletableFuture.supplyAsync(() -> {
 			@NotNull ChunkPos chunkPos = chunk.getPos();
 			chunk.setLightOn(false);
@@ -240,11 +272,11 @@ public class ServerWorldLightingProvider extends ServerLightingProvider {
 	}
 
 	private void doLightUpdatesAsync() {
-		if (!hasUpdates() || (lightUpdatesFuture != null && !lightUpdatesFuture.isDone())) {
+		if (!hasUpdates() || (lightUpdatesCompletableFuture != null && !lightUpdatesCompletableFuture.isDone())) {
 			return;
 		}
 
-		lightUpdatesFuture = CompletableFuture.runAsync(() -> {
+		lightUpdatesCompletableFuture = CompletableFuture.runAsync(() -> {
 			blockLightProvider.doLightUpdates();
 			skyLightProvider.doLightUpdates();
 		}, threadPoolExecutor);

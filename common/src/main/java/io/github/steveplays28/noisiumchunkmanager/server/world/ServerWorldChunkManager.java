@@ -152,7 +152,9 @@ public class ServerWorldChunkManager {
 		}, threadPoolExecutor).whenComplete((fetchedWorldChunk, throwable) -> {
 			if (throwable != null) {
 				NoisiumChunkManager.LOGGER.error(
-						"Exception thrown while getting a chunk asynchronously:\n{}", ExceptionUtils.getStackTrace(throwable));
+						"Exception thrown while getting a chunk asynchronously:\n{}",
+						ExceptionUtils.getStackTrace(ExceptionUtils.getRootCause(throwable))
+				);
 				loadingWorldChunks.remove(chunkPos);
 				return;
 			}

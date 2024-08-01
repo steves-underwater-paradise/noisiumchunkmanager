@@ -31,6 +31,7 @@
     "world.chunk.light.BlockLightStorageDataMixin",
     "world.chunk.light.ChunkLightProviderMixin",
     "world.chunk.light.LightStorageMixin",
+    "world.chunk.light.LightStorageMixin$PropagationFlagsMixin",
     "world.chunk.light.SkyLightStorageMixin",
     "world.chunk.light.SkyLightStorageMixin$DataMixin",
     "world.gen.feature.OreFeatureMixin",

@@ -1,5 +1,7 @@
 package io.github.steveplays28.noisiumchunkmanager.mixin.world.chunk.light;
 
+import com.llamalad7.mixinextras.sugar.Local;
+import com.llamalad7.mixinextras.sugar.ref.LocalIntRef;
 import io.github.steveplays28.noisiumchunkmanager.extension.world.chunk.light.LightStorageExtension;
 import it.unimi.dsi.fastutil.longs.*;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
@@ -18,6 +20,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.Map;
 import java.util.Set;
@@ -370,5 +373,29 @@ public abstract class LightStorageMixin implements LightStorageExtension {
 	@Override
 	public Map<Long, Object> noisiumchunkmanager$getQueuedSections() {
 		return noisiumchunkmanager$queuedSections;
+	}
+
+	@Mixin(targets = "net.minecraft.world.chunk.light.LightStorage$PropagationFlags")
+	private static class PropagationFlagsMixin {
+		@Shadow
+		@Final
+		private static int MIN_NEIGHBOR_COUNT;
+		@Shadow
+		@Final
+		private static int MAX_NEIGHBOR_COUNT;
+		@Shadow
+		@Final
+		private static byte NEIGHBOR_COUNT_MASK;
+
+		@Inject(method = "withNeighborCount", at = @At(value = "HEAD"), cancellable = true)
+		private static void noisiumchunkmanager$clampBytes(@NotNull CallbackInfoReturnable<Byte> cir, @Local(argsOnly = true) byte packed, @Local(argsOnly = true) @NotNull LocalIntRef neighborCount) {
+			if (neighborCount.get() < MIN_NEIGHBOR_COUNT) {
+				neighborCount.set((byte) MIN_NEIGHBOR_COUNT);
+			} else if (neighborCount.get() > MAX_NEIGHBOR_COUNT) {
+				neighborCount.set((byte) MAX_NEIGHBOR_COUNT);
+			}
+
+			cir.setReturnValue((byte) (packed & 0xFFFFFFE0 | neighborCount.get() & NEIGHBOR_COUNT_MASK));
+		}
 	}
 }
