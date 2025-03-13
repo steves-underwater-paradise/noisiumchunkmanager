@@ -87,8 +87,9 @@ public class ServerWorldLightingProvider extends ServerLightingProvider {
 					return;
 				}
 
+				litChunk.setLightOn(true);
 				// TODO: Change to a functional interface
-				instance.getChunkManager().removeTicket(ChunkTicketType.LIGHT, worldChunkPosition, 1, worldChunkPosition);
+				instance.getChunkManager().removeTicket(ChunkTicketType.LIGHT, worldChunkPosition, 2, worldChunkPosition);
 			});
 		});
 		ServerChunkEvent.LIGHT_UPDATE.register((instance, lightType, chunkSectionPosition) -> {

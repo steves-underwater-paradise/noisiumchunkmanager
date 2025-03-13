@@ -287,6 +287,9 @@ public class ServerWorldChunkManager {
 	}
 
 	public void unloadChunk(@NotNull ChunkPos chunkPosition) {
+		if (hasTicketAtPositionFunction.apply(chunkPosition)) {
+			return;
+		}
 		if (loadingWorldChunks.containsKey(chunkPosition)) {
 			unloadingWorldChunks.add(chunkPosition);
 			return;

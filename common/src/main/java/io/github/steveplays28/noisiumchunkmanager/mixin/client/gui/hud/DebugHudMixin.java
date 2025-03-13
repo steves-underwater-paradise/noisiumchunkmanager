@@ -29,6 +29,9 @@ public abstract class DebugHudMixin {
 	@Shadow
 	protected abstract @Nullable ServerWorld getServerWorld();
 
+	@Shadow
+	protected abstract @Nullable WorldChunk getChunk();
+
 	@Inject(method = "getChunk", at = @At(value = "HEAD"), cancellable = true)
 	private void noisiumchunkmanager$getChunkFromNoisiumServerWorldChunkManager(@NotNull CallbackInfoReturnable<WorldChunk> cir) {
 		@Nullable var serverWorld = this.getServerWorld();
@@ -47,13 +50,20 @@ public abstract class DebugHudMixin {
 		cir.setReturnValue(noisiumServerWorldChunkManager.getChunk(playerChunkPosition));
 	}
 
-	@Inject(method = "getLeftText", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/hud/DebugHud;getChunk()Lnet/minecraft/world/chunk/WorldChunk;"))
-	private void e(@NotNull CallbackInfoReturnable<List<String>> cir, @Local @NotNull List<String> leftText, @Local @NotNull BlockPos clientCameraBlockPosition) {
+	@Inject(method = "getLeftText", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/hud/DebugHud;getChunk()Lnet/minecraft/world/chunk/WorldChunk;", shift = At.Shift.AFTER))
+	private void noisiumchunkmanager$addDebugInfo(@NotNull CallbackInfoReturnable<List<String>> cir, @Local @NotNull List<String> leftText, @Local @NotNull BlockPos clientCameraBlockPosition) {
 		@Nullable var serverWorld = this.getServerWorld();
 		if (serverWorld == null) {
 			return;
 		}
 
+		@Nullable var serverWorldChunk = this.getChunk();
+		if (serverWorldChunk == null) {
+			leftText.add("Chunk is unloaded server-side");
+			return;
+		}
+
+		leftText.add(String.format("Is chunk light on: %s", serverWorldChunk.isLightOn()));
 		leftText.add(String.format(
 				"Server Light: %s (%s sky, %s block)",
 				serverWorld.getLightingProvider().getLight(clientCameraBlockPosition, 0),

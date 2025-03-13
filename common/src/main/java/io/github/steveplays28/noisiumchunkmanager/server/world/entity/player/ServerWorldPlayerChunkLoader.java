@@ -33,6 +33,8 @@ public class ServerWorldPlayerChunkLoader {
 	private final @NotNull Function<ChunkPos, CompletableFuture<WorldChunk>> worldChunkLoadFunction;
 	private final @NotNull Consumer<ChunkPos> worldChunkUnloadConsumer;
 	private final @NotNull Supplier<Integer> serverViewDistanceSupplier;
+	private final @NotNull Consumer<ChunkPos> addPlayerTicketConsumer;
+	private final @NotNull Consumer<ChunkPos> removePlayerTicketConsumer;
 
 	private final @NotNull Executor threadPoolExecutor;
 	private final @NotNull Map<Integer, Vec3d> previousPlayerPositions;
@@ -44,7 +46,9 @@ public class ServerWorldPlayerChunkLoader {
 			@NotNull BiFunction<ChunkPos, Integer, Map<ChunkPos, CompletableFuture<WorldChunk>>> worldChunksInRadiusLoadFunction,
 			@NotNull Function<ChunkPos, CompletableFuture<WorldChunk>> worldChunkLoadFunction,
 			@NotNull Consumer<ChunkPos> worldChunkUnloadConsumer,
-			@NotNull Supplier<Integer> serverViewDistanceSupplier
+			@NotNull Supplier<Integer> serverViewDistanceSupplier,
+			@NotNull Consumer<ChunkPos> addPlayerTicketConsumer,
+			@NotNull Consumer<ChunkPos> removePlayerTicketConsumer
 	) {
 		this.serverWorld = serverWorld;
 		this.skyLightProviderSupplier = skyLightProviderSupplier;
@@ -52,6 +56,8 @@ public class ServerWorldPlayerChunkLoader {
 		this.worldChunkLoadFunction = worldChunkLoadFunction;
 		this.worldChunkUnloadConsumer = worldChunkUnloadConsumer;
 		this.serverViewDistanceSupplier = serverViewDistanceSupplier;
+		this.addPlayerTicketConsumer = addPlayerTicketConsumer;
+		this.removePlayerTicketConsumer = removePlayerTicketConsumer;
 
 		this.threadPoolExecutor = Executors.newFixedThreadPool(
 				1, new ThreadFactoryBuilder().setNameFormat("Noisium Server Player Chunk Loader %d").build());
@@ -104,18 +110,22 @@ public class ServerWorldPlayerChunkLoader {
 				continue;
 			}
 
+			@NotNull var previousPlayerChunkPosition = new ChunkPos(
+					new BlockPos(
+							Math.round((float) previousPlayerPos.getX()),
+							Math.round((float) previousPlayerPos.getY()),
+							Math.round((float) previousPlayerPos.getZ())
+					)
+			);
+			@NotNull var playerChunkPosition = player.getChunkPos();
+			removePlayerTicketConsumer.accept(previousPlayerChunkPosition);
+			addPlayerTicketConsumer.accept(playerChunkPosition);
+
 			// Send world chunks that should be loaded to the player asynchronously
 			@NotNull var previousPlayerChunkPositionsInServerViewDistance = ChunkUtil.getChunkPositionsAtPositionInRadius(
-					new ChunkPos(
-							new BlockPos(
-									Math.round((float) previousPlayerPos.getX()),
-									Math.round((float) previousPlayerPos.getY()),
-									Math.round((float) previousPlayerPos.getZ())
-							)
-					), serverViewDistanceSupplier.get()
-			);
+					previousPlayerChunkPosition, serverViewDistanceSupplier.get());
 			@NotNull var playerChunkPositionsInServerViewDistance = ChunkUtil.getChunkPositionsAtPositionInRadius(
-					player.getChunkPos(), serverViewDistanceSupplier.get());
+					playerChunkPosition, serverViewDistanceSupplier.get());
 			@NotNull final var chunkPositionsToLoad = ChunkUtil.getChunkPositionDifferences(
 					playerChunkPositionsInServerViewDistance, previousPlayerChunkPositionsInServerViewDistance);
 			for (int chunkPositionsToLoadIndex = 0; chunkPositionsToLoadIndex < chunkPositionsToLoad.size(); chunkPositionsToLoadIndex++) {

@@ -19,10 +19,7 @@ import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.WorldGenerationProgressListener;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ChunkLevelType;
-import net.minecraft.server.world.ServerChunkManager;
-import net.minecraft.server.world.ServerEntityManager;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.server.world.*;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.random.RandomSequencesState;
@@ -42,6 +39,7 @@ import net.minecraft.world.gen.noise.NoiseConfig;
 import net.minecraft.world.level.ServerWorldProperties;
 import net.minecraft.world.level.storage.LevelStorage;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.mixin.injection.At;
@@ -168,7 +166,25 @@ public abstract class ServerWorldMixin extends World implements ServerWorldExten
 				() -> noisiumchunkmanager$getServerWorldLightingProvider().get(LightType.BLOCK),
 				noisiumchunkmanager$serverWorldChunkManager::getChunksInRadiusAsync,
 				noisiumchunkmanager$serverWorldChunkManager::getChunkAsync,
-				noisiumchunkmanager$serverWorldChunkManager::unloadChunk, server.getPlayerManager()::getViewDistance
+				noisiumchunkmanager$serverWorldChunkManager::unloadChunk, server.getPlayerManager()::getViewDistance,
+				(chunkPosition) -> {
+					@Nullable var serverChunkManager = serverWorld.getChunkManager();
+					if (serverChunkManager == null) {
+						return;
+					}
+
+					serverChunkManager.addTicket(
+							ChunkTicketType.PLAYER, chunkPosition, server.getPlayerManager().getViewDistance(), chunkPosition);
+				},
+				(chunkPosition) -> {
+					@Nullable var serverChunkManager = serverWorld.getChunkManager();
+					if (serverChunkManager == null) {
+						return;
+					}
+
+					serverChunkManager.removeTicket(
+							ChunkTicketType.PLAYER, chunkPosition, server.getPlayerManager().getViewDistance(), chunkPosition);
+				}
 		);
 
 		// TODO: Redo the server entity manager entirely, in an event-based way

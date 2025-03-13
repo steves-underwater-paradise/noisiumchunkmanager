@@ -66,6 +66,7 @@ public class ServerWorldTicketTracker {
 			return;
 		}
 
+		// TODO: Fix chunks being unloaded when they should stay loaded because of another ticket
 		unloadChunkConsumer.accept(chunkPosition);
 		tickets.remove(chunkPosition);
 	}
@@ -79,6 +80,7 @@ public class ServerWorldTicketTracker {
 			}
 
 			@NotNull var ticketChunkPosition = ticketEntry.getKey();
+			// TODO: Fix chunks being unloaded when they should stay loaded because of another ticket
 			unloadChunkConsumer.accept(ticketChunkPosition);
 			tickets.remove(ticketChunkPosition);
 		}
