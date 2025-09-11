@@ -7,7 +7,7 @@
   "mixins": [
     "accessor.server.network.SpawnLocatingAccessor",
     "accessor.util.collection.PackedIntegerArrayAccessor",
-    "accessor.world.gen.chunk.ChunkGeneratorAccessor",
+    "accessor.world.gen.chunk.NoiseChunkGeneratorAccessor",
     "block.LichenGrowerGrowCheckerMixin",
     "client.gui.WorldGenerationProgressTrackerMixin",
     "compat.distanthorizons.common.wrappers.world.gen.DHBatchGenerationEnvironmentMixin",

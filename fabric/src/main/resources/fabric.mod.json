@@ -59,7 +59,6 @@
     "yet_another_config_lib_v3": ">=${yet_another_config_lib_version}-fabric"
   },
   "breaks": {
-    "c2me": "*",
     "vmp": "*",
     "leavesbegone": "*",
     "ksyxis": "*"

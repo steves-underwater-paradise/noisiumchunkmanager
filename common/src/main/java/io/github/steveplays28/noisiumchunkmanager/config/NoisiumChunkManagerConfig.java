@@ -26,13 +26,13 @@ public class NoisiumChunkManagerConfig {
 	@AutoGen(category = SERVER_CATEGORY, group = SERVER_WORLD_CHUNK_MANAGER_GROUP)
 	@SerialEntry(comment = "Determines if the server world's chunk manager will load spawn chunks. Spawn chunks are an 11x11 chunk radius around the overworld's spawn position. After changing this option you MUST restart the server.")
 	@TickBox
-	public boolean loadSpawnChunks = true;
+	public boolean loadSpawnChunks = false;
 	@AutoGen(category = SERVER_CATEGORY, group = SERVER_WORLD_CHUNK_MANAGER_GROUP)
 	@SerialEntry(comment = "The amount of threads used by a server world's chunk manager. Every world has its own chunk manager, and thus its own threads. After changing this option you MUST restart the server.")
 	@IntField(min = 1, format = "%i threads")
-	public int serverWorldChunkManagerThreads = 2;
+	public int serverWorldChunkManagerThreads = 6;
 	@AutoGen(category = SERVER_CATEGORY, group = SERVER_WORLD_CHUNK_MANAGER_GROUP)
 	@SerialEntry(comment = "The amount of threads used by a server world's chunk manager lighting populator. Every world has its own chunk manager, and thus its own threads. After changing this option you MUST restart the server.")
 	@IntField(min = 1, format = "%i threads")
-	public int serverWorldChunkManagerLightingThreads = 2;
+	public int serverWorldChunkManagerLightingThreads = 1;
 }

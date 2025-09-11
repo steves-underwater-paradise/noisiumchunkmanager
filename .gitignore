@@ -107,6 +107,7 @@ gradle-app.setting
 .gradletasknamecache
 
 **/build/
+**/bin/
 
 # Common working directory
 run/
@@ -119,3 +120,9 @@ run/
 
 # Avoid ignoring libraries
 !libraries/**
+
+.zed/
+.project
+.factorypath
+.settings/
+.classpath
