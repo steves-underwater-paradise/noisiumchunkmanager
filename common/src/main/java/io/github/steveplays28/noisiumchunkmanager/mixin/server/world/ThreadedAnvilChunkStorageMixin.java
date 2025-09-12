@@ -1,9 +1,9 @@
 package io.github.steveplays28.noisiumchunkmanager.mixin.server.world;
 
-import net.minecraft.network.packet.s2c.play.ChunkDataS2CPacket;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ThreadedAnvilChunkStorage;
-import net.minecraft.util.math.ChunkPos;
+import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
+import net.minecraft.server.level.ChunkMap;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.ChunkPos;
 import org.apache.commons.lang3.mutable.MutableObject;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -11,14 +11,14 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(ThreadedAnvilChunkStorage.class)
+@Mixin(ChunkMap.class)
 public class ThreadedAnvilChunkStorageMixin {
-	@Inject(method = "sendWatchPackets", at = @At(value = "HEAD"), cancellable = true)
-	private void noisiumchunkmanager$cancelSendWatchPackets(ServerPlayerEntity player, ChunkPos pos, MutableObject<ChunkDataS2CPacket> packet, boolean oldWithinViewDistance, boolean newWithinViewDistance, CallbackInfo ci) {
+	@Inject(method = "updateChunkTracking", at = @At(value = "HEAD"), cancellable = true)
+	private void noisiumchunkmanager$cancelSendWatchPackets(ServerPlayer player, ChunkPos pos, MutableObject<ClientboundLevelChunkWithLightPacket> packet, boolean oldWithinViewDistance, boolean newWithinViewDistance, CallbackInfo ci) {
 		ci.cancel();
 	}
 
-	@Inject(method = "shouldDelayShutdown", at = @At(value = "HEAD"), cancellable = true)
+	@Inject(method = "hasWork", at = @At(value = "HEAD"), cancellable = true)
 	private void noisiumchunkmanager$cancelShutdownDelay(CallbackInfoReturnable<Boolean> cir) {
 		cir.setReturnValue(false);
 	}

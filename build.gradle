@@ -5,7 +5,6 @@
 plugins {
     id "architectury-plugin" version "${architectury_plugin_version}"
     id "dev.architectury.loom" version "${architectury_loom_version}" apply false
-    id "io.github.pacifistmc.forgix" version "${forgix_plugin_version}"
 }
 
 architectury {
@@ -17,7 +16,10 @@ subprojects {
 
     dependencies {
         minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
-        mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+        mappings loom.layered() {
+            it.officialMojangMappings()
+            it.parchment("org.parchmentmc.data:parchment-${rootProject.minecraft_version}:${rootProject.parchment_mappings_version}@zip")
+        }
     }
 }
 
@@ -36,6 +38,10 @@ allprojects {
         // See https://docs.gradle.org/current/userguide/declaring_repositories.html
         // for more information about repositories.
 
+         maven {
+             name = 'ParchmentMC'
+             url = 'https://maven.parchmentmc.org'
+         }
         maven {
             name = "Modrinth"
             url = "https://api.modrinth.com/maven"
@@ -56,6 +62,7 @@ allprojects {
     tasks.withType(JavaCompile).configureEach {
         options.encoding = "UTF-8"
         options.release = "${rootProject.java_version}" as int
+        options.compilerArgs << "-Xmaxerrs" << "2000"
     }
 
     java {

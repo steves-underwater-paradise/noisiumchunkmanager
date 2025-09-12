@@ -1,44 +1,44 @@
 package io.github.steveplays28.noisiumchunkmanager.world.chunk;
 
-import net.minecraft.block.Block;
-import net.minecraft.fluid.Fluid;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.world.World;
-import net.minecraft.world.chunk.WorldChunk;
-import net.minecraft.world.tick.BasicTickScheduler;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.ticks.TickContainerAccess;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A {@link ServerWorld} {@link WorldChunk} with disk (IO) access.
+ * A {@link ServerLevel} {@link LevelChunk} with disk (IO) access.
  */
 // TODO: Add disk (IO) access
-public class IoWorldChunk extends WorldChunk {
-	public IoWorldChunk(@NotNull World world, @NotNull ChunkPos chunkPosition) {
+public class IoWorldChunk extends LevelChunk {
+	public IoWorldChunk(@NotNull Level world, @NotNull ChunkPos chunkPosition) {
 		super(world, chunkPosition);
 	}
 
 	@Override
-	public @Nullable BasicTickScheduler<Block> getBlockTickScheduler() {
+	public @Nullable TickContainerAccess<Block> getBlockTicks() {
 		return null;
 	}
 
 	@Override
-	public @Nullable BasicTickScheduler<Fluid> getFluidTickScheduler() {
+	public @Nullable TickContainerAccess<Fluid> getFluidTicks() {
 		return null;
 	}
 
 	@Override
-	public @Nullable TickSchedulers getTickSchedulers() {
+	public @Nullable TicksToSave getTicksForSerialization() {
 		return null;
 	}
 
 	@Override
-	public @NotNull NbtCompound getPackedBlockEntityNbt(@NotNull BlockPos blockPosition) {
-		@Nullable var packedBlockEntityNbt = super.getPackedBlockEntityNbt(blockPosition);
-		return packedBlockEntityNbt == null ? new NbtCompound() : packedBlockEntityNbt;
+	public @NotNull CompoundTag getBlockEntityNbtForSaving(@NotNull BlockPos blockPosition) {
+		@Nullable var packedBlockEntityNbt = super.getBlockEntityNbtForSaving(blockPosition);
+		return packedBlockEntityNbt == null ? new CompoundTag() : packedBlockEntityNbt;
 	}
 }

@@ -1,7 +1,5 @@
 package io.github.steveplays28.noisiumchunkmanager.mixin.world.chunk;
 
-import net.minecraft.util.thread.LockHelper;
-import net.minecraft.world.chunk.PalettedContainer;
 import org.jetbrains.annotations.NotNull;
 import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.mixin.injection.At;
@@ -9,27 +7,26 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.concurrent.Semaphore;
+import net.minecraft.util.ThreadingDetector;
+import net.minecraft.world.level.chunk.PalettedContainer;
 
 @Mixin(PalettedContainer.class)
 public class PalettedContainerMixin {
 	@Shadow
 	@Final
 	@Mutable
-	private LockHelper lockHelper;
+	private ThreadingDetector threadingDetector;
 
 	@Unique
 	private final Semaphore noisiumchunkmanager$lock = new Semaphore(1);
 
-	@Inject(
-			method = {
-					"<init>(Lnet/minecraft/util/collection/IndexedIterable;Ljava/lang/Object;Lnet/minecraft/world/chunk/PalettedContainer$PaletteProvider;)V",
-					"<init>(Lnet/minecraft/util/collection/IndexedIterable;Lnet/minecraft/world/chunk/PalettedContainer$PaletteProvider;Lnet/minecraft/world/chunk/PalettedContainer$Data;)V",
-					"<init>(Lnet/minecraft/util/collection/IndexedIterable;Lnet/minecraft/world/chunk/PalettedContainer$PaletteProvider;Lnet/minecraft/world/chunk/PalettedContainer$DataProvider;Lnet/minecraft/util/collection/PaletteStorage;Ljava/util/List;)V",
-			},
-			at = @At("TAIL")
-	)
+	@Inject(method = {
+			"<init>(Lnet/minecraft/core/IdMap;Ljava/lang/Object;Lnet/minecraft/world/level/chunk/PalettedContainer$Strategy;)V",
+			"<init>(Lnet/minecraft/core/IdMap;Lnet/minecraft/world/level/chunk/PalettedContainer$Strategy;Lnet/minecraft/world/level/chunk/PalettedContainer$Data;)V",
+			"<init>(Lnet/minecraft/core/IdMap;Lnet/minecraft/world/level/chunk/PalettedContainer$Strategy;Lnet/minecraft/world/level/chunk/PalettedContainer$Configuration;Lnet/minecraft/util/BitStorage;Ljava/util/List;)V",
+	}, at = @At("TAIL"))
 	public void removeLockHelper(@NotNull CallbackInfo ci) {
-		this.lockHelper = null;
+		this.threadingDetector = null;
 	}
 
 	/**
@@ -37,7 +34,7 @@ public class PalettedContainerMixin {
 	 * @author Steveplays28
 	 */
 	@Overwrite
-	public void lock() {
+	public void acquire() {
 		noisiumchunkmanager$lock.acquireUninterruptibly();
 	}
 
@@ -46,7 +43,7 @@ public class PalettedContainerMixin {
 	 * @author Steveplays28
 	 */
 	@Overwrite
-	public void unlock() {
+	public void release() {
 		noisiumchunkmanager$lock.release();
 	}
 }

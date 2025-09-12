@@ -4,36 +4,36 @@ import io.github.steveplays28.noisiumchunkmanager.server.world.ServerWorldChunkM
 import it.unimi.dsi.fastutil.ints.IntArraySet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.ObjectArraySet;
+import net.minecraft.CrashReport;
+import net.minecraft.CrashReportCategory;
+import net.minecraft.ReportedException;
 import net.minecraft.SharedConstants;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.registry.entry.RegistryEntryList;
-import net.minecraft.server.network.DebugInfoSender;
-import net.minecraft.structure.StructureStart;
-import net.minecraft.util.crash.CrashException;
-import net.minecraft.util.crash.CrashReport;
-import net.minecraft.util.crash.CrashReportSection;
-import net.minecraft.util.math.BlockBox;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.math.ChunkSectionPos;
-import net.minecraft.util.math.random.ChunkRandom;
-import net.minecraft.util.math.random.RandomSeed;
-import net.minecraft.util.math.random.Xoroshiro128PlusPlusRandom;
-import net.minecraft.world.StructureWorldAccess;
-import net.minecraft.world.biome.Biome;
-import net.minecraft.world.biome.GenerationSettings;
-import net.minecraft.world.biome.source.BiomeSource;
-import net.minecraft.world.chunk.Chunk;
-import net.minecraft.world.chunk.ChunkSection;
-import net.minecraft.world.gen.GenerationStep;
-import net.minecraft.world.gen.StructureAccessor;
-import net.minecraft.world.gen.chunk.ChunkGenerator;
-import net.minecraft.world.gen.feature.PlacedFeature;
-import net.minecraft.world.gen.feature.util.PlacedFeatureIndexer;
-import net.minecraft.world.gen.structure.Structure;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.Registry;
+import net.minecraft.core.SectionPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.protocol.game.DebugPackets;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeGenerationSettings;
+import net.minecraft.world.level.biome.BiomeSource;
+import net.minecraft.world.level.biome.FeatureSorter;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.levelgen.GenerationStep;
+import net.minecraft.world.level.levelgen.RandomSupport;
+import net.minecraft.world.level.levelgen.WorldgenRandom;
+import net.minecraft.world.level.levelgen.XoroshiroRandomSource;
+import net.minecraft.world.level.levelgen.placement.PlacedFeature;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureStart;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -51,48 +51,48 @@ import java.util.stream.Collectors;
 public abstract class ChunkGeneratorMixin {
 	@Shadow
 	@Final
-	private Supplier<List<PlacedFeatureIndexer.IndexedFeatures>> indexedFeaturesListSupplier;
+	private Supplier<List<FeatureSorter.StepFeatureData>> featuresPerStep;
 
 	@Shadow
-	private static BlockBox getBlockBoxForChunk(Chunk chunk) {
+	private static BoundingBox getWritableArea(ChunkAccess chunk) {
 		throw new RuntimeException();
 	}
 
 	@Shadow
 	@Final
-	private Function<RegistryEntry<Biome>, GenerationSettings> generationSettingsGetter;
+	private Function<Holder<Biome>, BiomeGenerationSettings> generationSettingsGetter;
 
 	@Shadow
 	public abstract BiomeSource getBiomeSource();
 
 	/**
-	 * Replaces {@link ChunkGenerator#addStructureReferences} with a simpler one, that only checks the center chunk, instead of iterating outwards.
+	 * Replaces {@link ChunkGenerator#createReferences} with a simpler one, that only checks the center chunk, instead of iterating outwards.
 	 * This fixes an infinite loop with {@link ServerWorldChunkManager}.
 	 */
-	@Inject(method = "addStructureReferences", at = @At(value = "HEAD"), cancellable = true)
-	public void noisiumchunkmanager$replaceAddStructureReferencesToFixAnInfiniteLoop(StructureWorldAccess world, StructureAccessor structureAccessor, Chunk chunk, CallbackInfo ci) {
+	@Inject(method = "createReferences", at = @At(value = "HEAD"), cancellable = true)
+	public void noisiumchunkmanager$replaceAddStructureReferencesToFixAnInfiniteLoop(WorldGenLevel world, StructureManager structureAccessor, ChunkAccess chunk, CallbackInfo ci) {
 		var chunkPos = chunk.getPos();
-		int chunkPosStartX = chunkPos.getStartX();
-		int chunkPosStartZ = chunkPos.getStartZ();
-		var chunkSectionPos = ChunkSectionPos.from(chunk);
+		int chunkPosStartX = chunkPos.getMinBlockX();
+		int chunkPosStartZ = chunkPos.getMinBlockZ();
+		var chunkSectionPos = SectionPos.bottomOf(chunk);
 		var chunkPosLong = chunkPos.toLong();
 
-		for (StructureStart structureStart : chunk.getStructureStarts().values()) {
+		for (StructureStart structureStart : chunk.getAllStarts().values()) {
 			try {
-				if (structureStart.hasChildren() && structureStart.getBoundingBox().intersectsXZ(
+				if (structureStart.isValid() && structureStart.getBoundingBox().intersects(
 						chunkPosStartX, chunkPosStartZ, chunkPosStartX + 15, chunkPosStartZ + 15)
 				) {
-					structureAccessor.addStructureReference(chunkSectionPos, structureStart.getStructure(), chunkPosLong, chunk);
-					DebugInfoSender.sendStructureStart(world, structureStart);
+					structureAccessor.addReferenceForStructure(chunkSectionPos, structureStart.getStructure(), chunkPosLong, chunk);
+					DebugPackets.sendStructurePacket(world, structureStart);
 				}
 			} catch (Exception e) {
-				CrashReport crashReport = CrashReport.create(e, "Generating structure reference");
-				CrashReportSection crashReportSection = crashReport.addElement("Structure");
-				crashReportSection.add(
+				CrashReport crashReport = CrashReport.forThrowable(e, "Generating structure reference");
+				CrashReportCategory crashReportSection = crashReport.addCategory("Structure");
+				crashReportSection.setDetail(
 						"Id",
-						() -> world.getRegistryManager().getOptional(RegistryKeys.STRUCTURE).map(
+						() -> world.registryAccess().registry(Registries.STRUCTURE).map(
 								structureTypeRegistry -> {
-									var structureId = structureTypeRegistry.getId(structureStart.getStructure());
+									var structureId = structureTypeRegistry.getKey(structureStart.getStructure());
 									if (structureId == null) {
 										return "UNKNOWN";
 									}
@@ -101,10 +101,10 @@ public abstract class ChunkGeneratorMixin {
 								}
 						).orElse("UNKNOWN")
 				);
-				crashReportSection.add(
+				crashReportSection.setDetail(
 						"Name",
 						() -> {
-							var structureTypeId = Registries.STRUCTURE_TYPE.getId(structureStart.getStructure().getType());
+							var structureTypeId = BuiltInRegistries.STRUCTURE_TYPE.getKey(structureStart.getStructure().type());
 							if (structureTypeId == null) {
 								return "UNKNOWN";
 							}
@@ -112,8 +112,8 @@ public abstract class ChunkGeneratorMixin {
 							return structureTypeId.toString();
 						}
 				);
-				crashReportSection.add("Class", () -> structureStart.getStructure().getClass().getCanonicalName());
-				throw new CrashException(crashReport);
+				crashReportSection.setDetail("Class", () -> structureStart.getStructure().getClass().getCanonicalName());
+				throw new ReportedException(crashReport);
 			}
 		}
 
@@ -125,59 +125,59 @@ public abstract class ChunkGeneratorMixin {
 	 * @reason TODO
 	 */
 	@Overwrite
-	public void generateFeatures(StructureWorldAccess world, Chunk chunk, StructureAccessor structureAccessor) {
+	public void applyBiomeDecoration(WorldGenLevel world, ChunkAccess chunk, StructureManager structureAccessor) {
 		ChunkPos chunkPos = chunk.getPos();
-		if (SharedConstants.isOutsideGenerationArea(chunkPos)) {
+		if (SharedConstants.debugVoidTerrain(chunkPos)) {
 			return;
 		}
 
-		ChunkSectionPos chunkSectionPos = ChunkSectionPos.from(chunkPos, world.getBottomSectionCoord());
-		BlockPos blockPos = chunkSectionPos.getMinPos();
-		Registry<Structure> registry = world.getRegistryManager().get(RegistryKeys.STRUCTURE);
+		SectionPos chunkSectionPos = SectionPos.of(chunkPos, world.getMinSection());
+		BlockPos blockPos = chunkSectionPos.origin();
+		Registry<Structure> registry = world.registryAccess().registryOrThrow(Registries.STRUCTURE);
 		Map<Integer, List<Structure>> map = registry.stream().collect(
-				Collectors.groupingBy((structureType) -> structureType.getFeatureGenerationStep().ordinal()));
-		List<PlacedFeatureIndexer.IndexedFeatures> indexedFeatures = this.indexedFeaturesListSupplier.get();
-		ChunkRandom chunkRandom = new ChunkRandom(new Xoroshiro128PlusPlusRandom(RandomSeed.getSeed()));
-		long l = chunkRandom.setPopulationSeed(world.getSeed(), blockPos.getX(), blockPos.getZ());
-		Set<RegistryEntry<Biome>> biomeRegistryEntries = new ObjectArraySet<>();
-		for (ChunkSection chunkSection : chunk.getSectionArray()) {
-			chunkSection.getBiomeContainer().forEachValue(biomeRegistryEntries::add);
+				Collectors.groupingBy((structureType) -> structureType.step().ordinal()));
+		List<FeatureSorter.StepFeatureData> indexedFeatures = this.featuresPerStep.get();
+		WorldgenRandom chunkRandom = new WorldgenRandom(new XoroshiroRandomSource(RandomSupport.generateUniqueSeed()));
+		long l = chunkRandom.setDecorationSeed(world.getSeed(), blockPos.getX(), blockPos.getZ());
+		Set<Holder<Biome>> biomeRegistryEntries = new ObjectArraySet<>();
+		for (LevelChunkSection chunkSection : chunk.getSections()) {
+			chunkSection.getBiomes().getAll(biomeRegistryEntries::add);
 		}
-		biomeRegistryEntries.retainAll(this.getBiomeSource().getBiomes());
+		biomeRegistryEntries.retainAll(this.getBiomeSource().possibleBiomes());
 		int indexedFeaturesSize = indexedFeatures.size();
 
 		try {
-			Registry<PlacedFeature> placedFeatureRegistry = world.getRegistryManager().get(RegistryKeys.PLACED_FEATURE);
-			int j = Math.max(GenerationStep.Feature.values().length, indexedFeaturesSize);
+			Registry<PlacedFeature> placedFeatureRegistry = world.registryAccess().registryOrThrow(Registries.PLACED_FEATURE);
+			int j = Math.max(GenerationStep.Decoration.values().length, indexedFeaturesSize);
 
 			for (int indexedFeatureIndex = 0; indexedFeatureIndex < j; ++indexedFeatureIndex) {
 				int m = 0;
-				CrashReportSection crashReportSection;
+				CrashReportCategory crashReportSection;
 				if (structureAccessor.shouldGenerateStructures()) {
 					List<Structure> list2 = map.getOrDefault(indexedFeatureIndex, Collections.emptyList());
 
 					for (var biomeRegistryEntriesIterator = list2.iterator(); biomeRegistryEntriesIterator.hasNext(); ++m) {
 						Structure structure = biomeRegistryEntriesIterator.next();
-						chunkRandom.setDecoratorSeed(l, m, indexedFeatureIndex);
+						chunkRandom.setFeatureSeed(l, m, indexedFeatureIndex);
 						Supplier<String> currentlyGeneratingStructureNameSupplier = () -> {
-							var placedFeatureNameOptional = registry.getKey(structure).map(Object::toString);
+							var placedFeatureNameOptional = registry.getResourceKey(structure).map(Object::toString);
 							Objects.requireNonNull(structure);
 							return placedFeatureNameOptional.orElseGet(structure::toString);
 						};
 
 						try {
-							world.setCurrentlyGeneratingStructureName(currentlyGeneratingStructureNameSupplier);
+							world.setCurrentlyGenerating(currentlyGeneratingStructureNameSupplier);
 							//noinspection DataFlowIssue
-							structureAccessor.getStructureStarts(chunkSectionPos, structure).forEach((start) -> start.place(
+							structureAccessor.startsForStructure(chunkSectionPos, structure).forEach((start) -> start.placeInChunk(
 									world, structureAccessor, (ChunkGenerator) (Object) this, chunkRandom,
-									getBlockBoxForChunk(chunk), chunkPos
+									getWritableArea(chunk), chunkPos
 							));
 						} catch (Exception e) {
-							CrashReport crashReport = CrashReport.create(e, "Feature placement");
-							crashReportSection = crashReport.addElement("Feature");
+							CrashReport crashReport = CrashReport.forThrowable(e, "Feature placement");
+							crashReportSection = crashReport.addCategory("Feature");
 							Objects.requireNonNull(currentlyGeneratingStructureNameSupplier);
-							crashReportSection.add("Description", currentlyGeneratingStructureNameSupplier::get);
-							throw new CrashException(crashReport);
+							crashReportSection.setDetail("Description", currentlyGeneratingStructureNameSupplier::get);
+							throw new ReportedException(crashReport);
 						}
 					}
 				}
@@ -185,13 +185,13 @@ public abstract class ChunkGeneratorMixin {
 				if (indexedFeatureIndex < indexedFeaturesSize) {
 					IntSet placedFeatureIndexMappings = new IntArraySet();
 
-					for (RegistryEntry<Biome> biomeRegistryEntry : biomeRegistryEntries) {
-						List<RegistryEntryList<PlacedFeature>> placedFeatureRegistryEntries = this.generationSettingsGetter.apply(
-								biomeRegistryEntry).getFeatures();
+					for (Holder<Biome> biomeRegistryEntry : biomeRegistryEntries) {
+						List<HolderSet<PlacedFeature>> placedFeatureRegistryEntries = this.generationSettingsGetter.apply(
+								biomeRegistryEntry).features();
 						if (indexedFeatureIndex < placedFeatureRegistryEntries.size()) {
-							RegistryEntryList<PlacedFeature> registryEntryList = placedFeatureRegistryEntries.get(indexedFeatureIndex);
-							PlacedFeatureIndexer.IndexedFeatures indexedFeature = indexedFeatures.get(indexedFeatureIndex);
-							registryEntryList.stream().map(RegistryEntry::value).forEach(
+							HolderSet<PlacedFeature> registryEntryList = placedFeatureRegistryEntries.get(indexedFeatureIndex);
+							FeatureSorter.StepFeatureData indexedFeature = indexedFeatures.get(indexedFeatureIndex);
+							registryEntryList.stream().map(Holder::value).forEach(
 									(placedFeature) -> placedFeatureIndexMappings.add(
 											indexedFeature.indexMapping().applyAsInt(placedFeature)));
 						}
@@ -200,38 +200,38 @@ public abstract class ChunkGeneratorMixin {
 					int placedFeatureIndexMappingsSize = placedFeatureIndexMappings.size();
 					int[] placedFeatureIndexMappingsArray = placedFeatureIndexMappings.toIntArray();
 					Arrays.sort(placedFeatureIndexMappingsArray);
-					PlacedFeatureIndexer.IndexedFeatures indexedFeature = indexedFeatures.get(indexedFeatureIndex);
+					FeatureSorter.StepFeatureData indexedFeature = indexedFeatures.get(indexedFeatureIndex);
 
 					for (int o = 0; o < placedFeatureIndexMappingsSize; ++o) {
 						int p = placedFeatureIndexMappingsArray[o];
 						PlacedFeature placedFeature = indexedFeature.features().get(p);
 						Supplier<String> currentlyGeneratingStructureNameSupplier = () -> {
-							var placedFeatureNameOptional = placedFeatureRegistry.getKey(placedFeature).map(Object::toString);
+							var placedFeatureNameOptional = placedFeatureRegistry.getResourceKey(placedFeature).map(Object::toString);
 							Objects.requireNonNull(placedFeature);
 							return placedFeatureNameOptional.orElseGet(placedFeature::toString);
 						};
-						chunkRandom.setDecoratorSeed(l, p, indexedFeatureIndex);
+						chunkRandom.setFeatureSeed(l, p, indexedFeatureIndex);
 
 						try {
-							world.setCurrentlyGeneratingStructureName(currentlyGeneratingStructureNameSupplier);
+							world.setCurrentlyGenerating(currentlyGeneratingStructureNameSupplier);
 							//noinspection DataFlowIssue
-							placedFeature.generate(world, (ChunkGenerator) (Object) this, chunkRandom, blockPos);
+							placedFeature.placeWithBiomeCheck(world, (ChunkGenerator) (Object) this, chunkRandom, blockPos);
 						} catch (Exception e) {
-							CrashReport crashReport = CrashReport.create(e, "Feature placement");
-							crashReportSection = crashReport.addElement("Feature");
+							CrashReport crashReport = CrashReport.forThrowable(e, "Feature placement");
+							crashReportSection = crashReport.addCategory("Feature");
 							Objects.requireNonNull(currentlyGeneratingStructureNameSupplier);
-							crashReportSection.add("Description", currentlyGeneratingStructureNameSupplier::get);
-							throw new CrashException(crashReport);
+							crashReportSection.setDetail("Description", currentlyGeneratingStructureNameSupplier::get);
+							throw new ReportedException(crashReport);
 						}
 					}
 				}
 			}
 
-			world.setCurrentlyGeneratingStructureName(null);
+			world.setCurrentlyGenerating(null);
 		} catch (Exception var31) {
-			CrashReport crashReport3 = CrashReport.create(var31, "Biome decoration");
-			crashReport3.addElement("Generation").add("CenterX", chunkPos.x).add("CenterZ", chunkPos.z).add("Seed", l);
-			throw new CrashException(crashReport3);
+			CrashReport crashReport3 = CrashReport.forThrowable(var31, "Biome decoration");
+			crashReport3.addCategory("Generation").setDetail("CenterX", chunkPos.x).setDetail("CenterZ", chunkPos.z).setDetail("Seed", l);
+			throw new ReportedException(crashReport3);
 		}
 	}
 }

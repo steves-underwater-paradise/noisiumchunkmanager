@@ -1,17 +1,6 @@
 package io.github.steveplays28.noisiumchunkmanager.util.world.chunk;
 
 import io.github.steveplays28.noisiumchunkmanager.NoisiumChunkManager;
-import net.minecraft.block.BlockState;
-import net.minecraft.network.packet.s2c.play.BlockUpdateS2CPacket;
-import net.minecraft.network.packet.s2c.play.ChunkDataS2CPacket;
-import net.minecraft.network.packet.s2c.play.LightUpdateS2CPacket;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.crash.CrashException;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.world.chunk.WorldChunk;
-import net.minecraft.world.chunk.light.LightingProvider;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.jetbrains.annotations.NotNull;
 
@@ -20,22 +9,33 @@ import java.util.BitSet;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import net.minecraft.ReportedException;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
+import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
+import net.minecraft.network.protocol.game.ClientboundLightUpdatePacket;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.lighting.LevelLightEngine;
 
 public class ChunkUtil {
 	/**
-	 * Sends a {@link WorldChunk} to all players in the specified world.
-	 * WARNING: This method blocks the server thread. Prefer using {@link ChunkUtil#sendWorldChunkToPlayerAsync(ServerWorld, CompletableFuture, Executor)} instead.
+	 * Sends a {@link LevelChunk} to all players in the specified world.
+	 * WARNING: This method blocks the server thread. Prefer using {@link ChunkUtil#sendWorldChunkToPlayerAsync(ServerLevel, CompletableFuture, Executor)} instead.
 	 *
-	 * @param serverWorld The world the {@link WorldChunk} resides in.
-	 * @param worldChunk  The {@link WorldChunk}.
+	 * @param serverWorld The world the {@link LevelChunk} resides in.
+	 * @param worldChunk  The {@link LevelChunk}.
 	 */
-	public static void sendWorldChunkToPlayer(@NotNull ServerWorld serverWorld, @NotNull WorldChunk worldChunk) {
+	public static void sendWorldChunkToPlayer(@NotNull ServerLevel serverWorld, @NotNull LevelChunk worldChunk) {
 		try {
-			var chunkDataS2CPacket = new ChunkDataS2CPacket(worldChunk, serverWorld.getLightingProvider(), null, null);
-			for (int i = 0; i < serverWorld.getPlayers().size(); i++) {
-				serverWorld.getPlayers().get(i).sendChunkPacket(worldChunk.getPos(), chunkDataS2CPacket);
+			var chunkDataS2CPacket = new ClientboundLevelChunkWithLightPacket(worldChunk, serverWorld.getLightEngine(), null, null);
+			for (int i = 0; i < serverWorld.players().size(); i++) {
+				serverWorld.players().get(i).trackChunk(worldChunk.getPos(), chunkDataS2CPacket);
 			}
-		} catch (CrashException e) {
+		} catch (ReportedException e) {
 			NoisiumChunkManager.LOGGER.error(
 					"Exception thrown while trying to send a chunk packet to all players in a server world:\n{}",
 					ExceptionUtils.getStackTrace(e)
@@ -44,25 +44,25 @@ public class ChunkUtil {
 	}
 
 	/**
-	 * Sends a {@link WorldChunk} to all players in the specified world.
+	 * Sends a {@link LevelChunk} to all players in the specified world.
 	 * This method is ran asynchronously.
 	 *
-	 * @param serverWorld      The world the {@link WorldChunk} resides in.
+	 * @param serverWorld      The world the {@link LevelChunk} resides in.
 	 * @param worldChunkFuture The {@link CompletableFuture<WorldChunk>}.
 	 */
-	public static void sendWorldChunkToPlayerAsync(@NotNull ServerWorld serverWorld, @NotNull CompletableFuture<WorldChunk> worldChunkFuture, @NotNull Executor executor) {
+	public static void sendWorldChunkToPlayerAsync(@NotNull ServerLevel serverWorld, @NotNull CompletableFuture<LevelChunk> worldChunkFuture, @NotNull Executor executor) {
 		worldChunkFuture.whenCompleteAsync((worldChunk, throwable) -> sendWorldChunkToPlayer(serverWorld, worldChunk), executor);
 	}
 
 	/**
-	 * Sends a {@link List} of {@link WorldChunk}s to all players in the specified world.
-	 * WARNING: This method blocks the server thread. Prefer using {@link ChunkUtil#sendWorldChunksToPlayerAsync(ServerWorld, List, Executor)} instead.
+	 * Sends a {@link List} of {@link LevelChunk}s to all players in the specified world.
+	 * WARNING: This method blocks the server thread. Prefer using {@link ChunkUtil#sendWorldChunksToPlayerAsync(ServerLevel, List, Executor)} instead.
 	 *
-	 * @param serverWorld The world the {@link WorldChunk} resides in.
-	 * @param worldChunks The {@link List} of {@link WorldChunk}s.
+	 * @param serverWorld The world the {@link LevelChunk} resides in.
+	 * @param worldChunks The {@link List} of {@link LevelChunk}s.
 	 */
 	@SuppressWarnings("ForLoopReplaceableByForEach")
-	public static void sendWorldChunksToPlayer(@NotNull ServerWorld serverWorld, @NotNull List<WorldChunk> worldChunks) {
+	public static void sendWorldChunksToPlayer(@NotNull ServerLevel serverWorld, @NotNull List<LevelChunk> worldChunks) {
 		// TODO: Send a whole batch of chunks to the player at once to save on network traffic
 		for (int i = 0; i < worldChunks.size(); i++) {
 			sendWorldChunkToPlayer(serverWorld, worldChunks.get(i));
@@ -73,11 +73,11 @@ public class ChunkUtil {
 	 * Sends a {@link List} of {@link CompletableFuture<WorldChunk>}s to all players in the specified world.
 	 * This method is ran asynchronously.
 	 *
-	 * @param serverWorld       The world the {@link WorldChunk} resides in.
+	 * @param serverWorld       The world the {@link LevelChunk} resides in.
 	 * @param worldChunkFutures The {@link List} of {@link CompletableFuture<WorldChunk>}s
 	 */
 	@SuppressWarnings("ForLoopReplaceableByForEach")
-	public static void sendWorldChunksToPlayerAsync(@NotNull ServerWorld serverWorld, @NotNull List<CompletableFuture<WorldChunk>> worldChunkFutures, @NotNull Executor executor) {
+	public static void sendWorldChunksToPlayerAsync(@NotNull ServerLevel serverWorld, @NotNull List<CompletableFuture<LevelChunk>> worldChunkFutures, @NotNull Executor executor) {
 		// TODO: Send a whole batch of chunks to the player at once to save on network traffic
 		for (int i = 0; i < worldChunkFutures.size(); i++) {
 			worldChunkFutures.get(i).whenCompleteAsync(
@@ -89,15 +89,15 @@ public class ChunkUtil {
 	 * Sends a light update to a {@link List} of players.
 	 *
 	 * @param players          The {@link List} of players.
-	 * @param lightingProvider The {@link LightingProvider} of the world.
+	 * @param lightingProvider The {@link LevelLightEngine} of the world.
 	 * @param chunkPos         The {@link ChunkPos} at which the light update happened.
 	 * @param skyLightBits     The skylight {@link BitSet}.
 	 * @param blockLightBits   The blocklight {@link BitSet}.
 	 */
 	@SuppressWarnings("ForLoopReplaceableByForEach")
-	public static void sendLightUpdateToPlayers(@NotNull List<ServerPlayerEntity> players, @NotNull LightingProvider lightingProvider, @NotNull ChunkPos chunkPos, @NotNull BitSet skyLightBits, @NotNull BitSet blockLightBits) {
+	public static void sendLightUpdateToPlayers(@NotNull List<ServerPlayer> players, @NotNull LevelLightEngine lightingProvider, @NotNull ChunkPos chunkPos, @NotNull BitSet skyLightBits, @NotNull BitSet blockLightBits) {
 		for (int i = 0; i < players.size(); i++) {
-			players.get(i).networkHandler.sendPacket(new LightUpdateS2CPacket(chunkPos, lightingProvider, skyLightBits, blockLightBits));
+			players.get(i).connection.send(new ClientboundLightUpdatePacket(chunkPos, lightingProvider, skyLightBits, blockLightBits));
 		}
 	}
 
@@ -109,9 +109,9 @@ public class ChunkUtil {
 	 * @param blockState The {@link BlockState} at the specified {@link BlockPos} of the block update that should be sent to the {@link List} of players.
 	 */
 	@SuppressWarnings("ForLoopReplaceableByForEach")
-	public static void sendBlockUpdateToPlayers(@NotNull List<ServerPlayerEntity> players, @NotNull BlockPos blockPos, @NotNull BlockState blockState) {
+	public static void sendBlockUpdateToPlayers(@NotNull List<ServerPlayer> players, @NotNull BlockPos blockPos, @NotNull BlockState blockState) {
 		for (int i = 0; i < players.size(); i++) {
-			players.get(i).networkHandler.sendPacket(new BlockUpdateS2CPacket(blockPos, blockState));
+			players.get(i).connection.send(new ClientboundBlockUpdatePacket(blockPos, blockState));
 		}
 	}
 

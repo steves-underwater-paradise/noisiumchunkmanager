@@ -7,7 +7,7 @@ import dev.isxander.yacl3.config.v2.api.autogen.IntField;
 import dev.isxander.yacl3.config.v2.api.autogen.TickBox;
 import dev.isxander.yacl3.config.v2.api.serializer.GsonConfigSerializerBuilder;
 import io.github.steveplays28.noisiumchunkmanager.util.ModLoaderUtil;
-import net.minecraft.util.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.NotNull;
 
 import static io.github.steveplays28.noisiumchunkmanager.NoisiumChunkManager.MOD_ID;
@@ -15,7 +15,7 @@ import static io.github.steveplays28.noisiumchunkmanager.NoisiumChunkManager.MOD
 public class NoisiumChunkManagerConfig {
 	public static final @NotNull String JSON_5_FILE_EXTENSION = "json5";
 	public static final @NotNull ConfigClassHandler<NoisiumChunkManagerConfig> HANDLER = ConfigClassHandler.createBuilder(
-			NoisiumChunkManagerConfig.class).id(new Identifier(MOD_ID, "config")).serializer(
+			NoisiumChunkManagerConfig.class).id(new ResourceLocation(MOD_ID, "config")).serializer(
 			config -> GsonConfigSerializerBuilder.create(config).setPath(
 					ModLoaderUtil.getConfigDir().resolve(String.format("%s/config.%s", MOD_ID, JSON_5_FILE_EXTENSION))).setJson5(
 					true).build()).build();

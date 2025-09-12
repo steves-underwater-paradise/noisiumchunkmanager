@@ -3,10 +3,10 @@ package io.github.steveplays28.noisiumchunkmanager.server.player;
 import dev.architectury.event.EventResult;
 import dev.architectury.event.events.common.BlockEvent;
 import io.github.steveplays28.noisiumchunkmanager.util.world.chunk.ChunkUtil;
-import net.minecraft.block.Blocks;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
 import org.jetbrains.annotations.NotNull;
 
 public class ServerPlayerBlockUpdater {
@@ -16,12 +16,12 @@ public class ServerPlayerBlockUpdater {
 		BlockEvent.BREAK.register((world, blockPos, blockState, player, xp) -> onBlockBreak(world, blockPos));
 	}
 
-	private EventResult onBlockBreak(@NotNull World world, @NotNull BlockPos blockPos) {
-		if (world.isClient()) {
+	private EventResult onBlockBreak(@NotNull Level world, @NotNull BlockPos blockPos) {
+		if (world.isClientSide()) {
 			return EventResult.pass();
 		}
 
-		ChunkUtil.sendBlockUpdateToPlayers(((ServerWorld) world).getPlayers(), blockPos, Blocks.AIR.getDefaultState());
+		ChunkUtil.sendBlockUpdateToPlayers(((ServerLevel) world).players(), blockPos, Blocks.AIR.defaultBlockState());
 		return EventResult.pass();
 	}
 }

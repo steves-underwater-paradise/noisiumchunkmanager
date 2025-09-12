@@ -2,23 +2,23 @@ package io.github.steveplays28.noisiumchunkmanager.server.world.ticket;
 
 import dev.architectury.event.events.common.TickEvent;
 import io.github.steveplays28.noisiumchunkmanager.server.event.world.ticket.ServerWorldTicketEvent;
-import net.minecraft.server.world.ChunkTicketType;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.ChunkPos;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.TicketType;
+import net.minecraft.world.level.ChunkPos;
 
 public class ServerWorldTicketTracker {
-	private final @NotNull ServerWorld serverWorld;
+	private final @NotNull ServerLevel serverWorld;
 	private final @NotNull BiConsumer<ChunkPos, Integer> loadChunksInRadiusBiConsumer;
 	private final @NotNull Consumer<ChunkPos> unloadChunkConsumer;
 	private final @NotNull Map<ChunkPos, ServerWorldTicket> tickets;
 
-	public ServerWorldTicketTracker(@NotNull ServerWorld serverWorld, @NotNull BiConsumer<ChunkPos, Integer> loadChunksInRadiusBiConsumer, @NotNull Consumer<ChunkPos> unloadChunkConsumer) {
+	public ServerWorldTicketTracker(@NotNull ServerLevel serverWorld, @NotNull BiConsumer<ChunkPos, Integer> loadChunksInRadiusBiConsumer, @NotNull Consumer<ChunkPos> unloadChunkConsumer) {
 		this.serverWorld = serverWorld;
 		this.loadChunksInRadiusBiConsumer = loadChunksInRadiusBiConsumer;
 		this.unloadChunkConsumer = unloadChunkConsumer;
@@ -48,13 +48,13 @@ public class ServerWorldTicketTracker {
 		});
 	}
 
-	private void onTicketCreated(@NotNull ServerWorld serverWorld, @NotNull ChunkTicketType<?> ticketType, @NotNull ChunkPos chunkPosition, int radius) {
+	private void onTicketCreated(@NotNull ServerLevel serverWorld, @NotNull TicketType<?> ticketType, @NotNull ChunkPos chunkPosition, int radius) {
 		if (tickets.containsKey(chunkPosition)) {
 			return;
 		}
 
 		loadChunksInRadiusBiConsumer.accept(chunkPosition, radius);
-		tickets.put(chunkPosition, new ServerWorldTicket(serverWorld.getTime(), ticketType.getExpiryTicks()));
+		tickets.put(chunkPosition, new ServerWorldTicket(serverWorld.getGameTime(), ticketType.timeout()));
 	}
 
 	private void onTicketRemoved(@NotNull ChunkPos chunkPosition) {
@@ -70,7 +70,7 @@ public class ServerWorldTicketTracker {
 		for (@NotNull var ticketEntry : tickets.entrySet()) {
 			@NotNull var ticket = ticketEntry.getValue();
 			// TODO: Store endTick in the ServerWorldTicket instead of the startTick and duration
-			if (ticket.startTick() + ticket.duration() > this.serverWorld.getTime()) {
+			if (ticket.startTick() + ticket.duration() > this.serverWorld.getGameTime()) {
 				return;
 			}
 

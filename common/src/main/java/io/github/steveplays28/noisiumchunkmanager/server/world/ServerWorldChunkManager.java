@@ -10,33 +10,45 @@ import io.github.steveplays28.noisiumchunkmanager.extension.world.chunk.WorldChu
 import io.github.steveplays28.noisiumchunkmanager.server.event.world.chunk.ServerChunkEvent;
 import io.github.steveplays28.noisiumchunkmanager.util.world.chunk.ChunkUtil;
 import io.github.steveplays28.noisiumchunkmanager.mixin.accessor.util.collection.PackedIntegerArrayAccessor;
-import io.github.steveplays28.noisiumchunkmanager.mixin.accessor.world.gen.chunk.ChunkGeneratorAccessor;
 import io.github.steveplays28.noisiumchunkmanager.mixin.accessor.world.gen.chunk.NoiseChunkGeneratorAccessor;
 import io.github.steveplays28.noisiumchunkmanager.world.chunk.IoWorldChunk;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.entity.EntityType;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.server.world.ServerLightingProvider;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.collection.PackedIntegerArray;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.math.ChunkSectionPos;
-import net.minecraft.world.*;
-import net.minecraft.world.chunk.*;
-import net.minecraft.world.gen.GenerationStep;
-import net.minecraft.world.gen.chunk.Blender;
-import net.minecraft.world.gen.chunk.ChunkGenerator;
-import net.minecraft.world.gen.chunk.GenerationShapeConfig;
-import net.minecraft.world.gen.noise.NoiseConfig;
-import net.minecraft.world.poi.PointOfInterestStorage;
-import net.minecraft.world.poi.PointOfInterestType;
-import net.minecraft.world.poi.PointOfInterestTypes;
-import net.minecraft.world.storage.NbtScannable;
-import net.minecraft.world.storage.VersionedChunkStorage;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.SectionPos;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ThreadedLevelLightEngine;
+import net.minecraft.server.level.WorldGenRegion;
+
+import net.minecraft.util.SimpleBitStorage;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.ai.village.poi.PoiManager;
+import net.minecraft.world.entity.ai.village.poi.PoiType;
+import net.minecraft.world.entity.ai.village.poi.PoiTypes;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.LightLayer;
+
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.chunk.ChunkSource;
+import net.minecraft.world.level.chunk.ChunkStatus;
+import net.minecraft.world.level.chunk.LevelChunk;
+
+import net.minecraft.world.level.chunk.ProtoChunk;
+import net.minecraft.world.level.chunk.UpgradeData;
+import net.minecraft.world.level.chunk.storage.ChunkScanAccess;
+import net.minecraft.world.level.chunk.storage.ChunkSerializer;
+import net.minecraft.world.level.chunk.storage.ChunkStorage;
+import net.minecraft.world.level.levelgen.GenerationStep;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.NoiseSettings;
+import net.minecraft.world.level.levelgen.RandomState;
+import net.minecraft.world.level.levelgen.blending.Blender;
+
+import net.minecraft.world.level.storage.DimensionDataStorage;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -50,32 +62,32 @@ import java.util.function.Function;
 import static io.github.steveplays28.noisiumchunkmanager.NoisiumChunkManager.MOD_NAME;
 
 /**
- * A chunk manager for {@link ServerWorld}s.
- * This class cannot extend {@link net.minecraft.server.world.ServerChunkManager} or {@link ChunkManager} due to {@link ServerWorld}s requiring an implementation of {@link net.minecraft.server.world.ServerChunkManager}, which would slow the chunk manager down.
+ * A chunk manager for {@link ServerLevel}s.
+ * This class cannot extend {@link net.minecraft.server.level.ServerChunkCache} or {@link ChunkSource} due to {@link ServerLevel}s requiring an implementation of {@link net.minecraft.server.level.ServerChunkCache}, which would slow the chunk manager down.
  */
 // TODO: Fix canTickBlockEntities() check
 //  The check needs to be changed to point to the server world's isChunkLoaded() method
 // TODO: Implement chunk ticking
 // TODO: Save all chunks when save event is called
 public class ServerWorldChunkManager {
-	private final ServerWorld serverWorld;
+	private final ServerLevel serverWorld;
 	private final ChunkGenerator chunkGenerator;
-	private final NoiseConfig noiseConfig;
+	private final RandomState noiseConfig;
 	private final Consumer<Runnable> syncRunnableConsumer;
-	private final PersistentStateManager persistentStateManager;
-	private final PointOfInterestStorage pointOfInterestStorage;
-	private final VersionedChunkStorage versionedChunkStorage;
+	private final DimensionDataStorage persistentStateManager;
+	private final PoiManager pointOfInterestStorage;
+	private final ChunkStorage versionedChunkStorage;
 	private final Executor threadPoolExecutor;
 	private final Executor lightingThreadPoolExecutor;
-	private final ConcurrentMap<ChunkPos, CompletableFuture<WorldChunk>> loadingWorldChunks;
+	private final ConcurrentMap<ChunkPos, CompletableFuture<LevelChunk>> loadingWorldChunks;
 	private final Queue<ChunkPos> unloadingWorldChunks;
 	private final ConcurrentMap<ChunkPos, IoWorldChunk> ioWorldChunks;
-	private final Map<ChunkPos, WorldChunk> loadedWorldChunks;
+	private final Map<ChunkPos, LevelChunk> loadedWorldChunks;
 
 	private boolean isStopping;
 
 	@SuppressWarnings("ResultOfMethodCallIgnored")
-	public ServerWorldChunkManager(@NotNull ServerWorld serverWorld, @NotNull ChunkGenerator chunkGenerator, @NotNull NoiseConfig noiseConfig, @NotNull Consumer<Runnable> syncRunnableConsumer, @NotNull Path worldDirectoryPath, @NotNull DataFixer dataFixer) {
+	public ServerWorldChunkManager(@NotNull ServerLevel serverWorld, @NotNull ChunkGenerator chunkGenerator, @NotNull RandomState noiseConfig, @NotNull Consumer<Runnable> syncRunnableConsumer, @NotNull Path worldDirectoryPath, @NotNull DataFixer dataFixer) {
 		this.serverWorld = serverWorld;
 		this.chunkGenerator = chunkGenerator;
 		this.noiseConfig = noiseConfig;
@@ -83,17 +95,17 @@ public class ServerWorldChunkManager {
 
 		var worldDataFile = worldDirectoryPath.resolve("data").toFile();
 		worldDataFile.mkdirs();
-		this.persistentStateManager = new PersistentStateManager(worldDataFile, dataFixer);
-		this.pointOfInterestStorage = new PointOfInterestStorage(
-				worldDirectoryPath.resolve("poi"), dataFixer, false, serverWorld.getRegistryManager(), serverWorld);
-		this.versionedChunkStorage = new VersionedChunkStorage(worldDirectoryPath.resolve("region"), dataFixer, false);
+		this.persistentStateManager = new DimensionDataStorage(worldDataFile, dataFixer);
+		this.pointOfInterestStorage = new PoiManager(
+				worldDirectoryPath.resolve("poi"), dataFixer, false, serverWorld.registryAccess(), serverWorld);
+		this.versionedChunkStorage = new ChunkStorage(worldDirectoryPath.resolve("region"), dataFixer, false);
 		this.threadPoolExecutor = Executors.newFixedThreadPool(
 				NoisiumChunkManagerConfig.HANDLER.instance().serverWorldChunkManagerThreads, new ThreadFactoryBuilder().setNameFormat(
-						"Noisium Server World Chunk Manager " + serverWorld.getDimension().effects() + " %d").build());
+						"Noisium Server World Chunk Manager " + serverWorld.dimensionType().effectsLocation() + " %d").build());
 		this.lightingThreadPoolExecutor = Executors.newFixedThreadPool(
 				NoisiumChunkManagerConfig.HANDLER.instance().serverWorldChunkManagerLightingThreads,
 				new ThreadFactoryBuilder().setNameFormat(
-						"Noisium Server World Chunk Manager Lighting " + serverWorld.getDimension().effects() + " %d").build()
+						"Noisium Server World Chunk Manager Lighting " + serverWorld.dimensionType().effectsLocation() + " %d").build()
 		);
 		this.loadingWorldChunks = new ConcurrentHashMap<>();
 		this.unloadingWorldChunks = new ConcurrentLinkedQueue<>();
@@ -103,7 +115,7 @@ public class ServerWorldChunkManager {
 		// ServerChunkEvent.LIGHT_UPDATE.register(this::onLightUpdateAsync);
 		ServerChunkEvent.BLOCK_CHANGE.register(this::onBlockChange);
 		TickEvent.SERVER_LEVEL_POST.register(instance -> {
-			if (!instance.equals(serverWorld) || instance.getPlayers().isEmpty()) {
+			if (!instance.equals(serverWorld) || instance.players().isEmpty()) {
 				return;
 			}
 
@@ -113,7 +125,7 @@ public class ServerWorldChunkManager {
 		});
 		LifecycleEvent.SERVER_STOPPING.register(instance -> {
 			this.isStopping = true;
-			((ServerLightingProvider) serverWorld.getLightingProvider()).close();
+			((ThreadedLevelLightEngine) serverWorld.getLightEngine()).close();
 			for (var loadingWorldChunkCompletableFuture : loadingWorldChunks.values()) {
 				loadingWorldChunkCompletableFuture.cancel(true);
 			}
@@ -131,7 +143,7 @@ public class ServerWorldChunkManager {
 	 * @param chunkPos The position at which to load the chunk.
 	 * @return The loaded chunk.
 	 */
-	public @NotNull CompletableFuture<WorldChunk> getChunkAsync(ChunkPos chunkPos) {
+	public @NotNull CompletableFuture<LevelChunk> getChunkAsync(ChunkPos chunkPos) {
 		if (isStopping) {
 			return CompletableFuture.failedFuture(new IllegalStateException(
 					String.format("Can't get chunk because %s Server World Chunk Manager is stopping.", MOD_NAME)));
@@ -147,14 +159,14 @@ public class ServerWorldChunkManager {
 			var fetchedNbtData = getNbtDataAtChunkPosition(chunkPos);
 			if (fetchedNbtData == null) {
 				// TODO: Schedule ProtoChunk worldgen and update loadedWorldChunks incrementally during worldgen steps
-				return new WorldChunk(serverWorld, generateChunk(chunkPos, this::getIoWorldChunk, ioWorldChunks::remove), null);
+				return new LevelChunk(serverWorld, generateChunk(chunkPos, this::getIoWorldChunk, ioWorldChunks::remove), null);
 			}
 
-			versionedChunkStorage.updateChunkNbt(
-					serverWorld.getRegistryKey(), () -> persistentStateManager, fetchedNbtData, this.chunkGenerator.getCodecKey());
-			var fetchedChunk = ChunkSerializer.deserialize(serverWorld, pointOfInterestStorage, chunkPos, fetchedNbtData);
-			return new WorldChunk(serverWorld, fetchedChunk,
-					chunkToAddEntitiesTo -> serverWorld.addEntities(EntityType.streamFromNbt(fetchedChunk.getEntities(), serverWorld))
+			versionedChunkStorage.upgradeChunkTag(
+					serverWorld.dimension(), () -> persistentStateManager, fetchedNbtData, this.chunkGenerator.getTypeNameForDataFixer());
+			var fetchedChunk = ChunkSerializer.read(serverWorld, pointOfInterestStorage, chunkPos, fetchedNbtData);
+			return new LevelChunk(serverWorld, fetchedChunk,
+					chunkToAddEntitiesTo -> serverWorld.addWorldGenChunkEntities(EntityType.loadEntitiesRecursive(fetchedChunk.getEntities(), serverWorld))
 			);
 		}, threadPoolExecutor).whenComplete((fetchedWorldChunk, throwable) -> {
 			if (throwable != null) {
@@ -182,14 +194,14 @@ public class ServerWorldChunkManager {
 	}
 
 	/**
-	 * Loads the chunk at the specified position, returning the loaded {@link WorldChunk} when done.
+	 * Loads the chunk at the specified position, returning the loaded {@link LevelChunk} when done.
 	 * Returns the chunk from the {@link ServerWorldChunkManager#loadedWorldChunks} cache if available.
 	 * WARNING: This method blocks the server thread. Prefer using {@link ServerWorldChunkManager#getChunkAsync} instead.
 	 *
-	 * @param chunkPos The position at which to load the {@link WorldChunk}.
-	 * @return The loaded {@link WorldChunk}.
+	 * @param chunkPos The position at which to load the {@link LevelChunk}.
+	 * @return The loaded {@link LevelChunk}.
 	 */
-	public @NotNull WorldChunk getChunk(@NotNull ChunkPos chunkPos) {
+	public @NotNull LevelChunk getChunk(@NotNull ChunkPos chunkPos) {
 		if (isStopping) {
 			throw new IllegalStateException(String.format("Can't get chunk because %s Server World Chunk Manager is stopping.", MOD_NAME));
 		}
@@ -203,7 +215,7 @@ public class ServerWorldChunkManager {
 		var fetchedNbtData = getNbtDataAtChunkPosition(chunkPos);
 		if (fetchedNbtData == null) {
 			// TODO: Schedule ProtoChunk worldgen and update loadedWorldChunks incrementally during worldgen steps
-			var fetchedWorldChunk = new WorldChunk(
+			var fetchedWorldChunk = new LevelChunk(
 					serverWorld, generateChunk(chunkPos, this::getIoWorldChunk, ioWorldChunks::remove), null);
 			if (!unloadingWorldChunks.contains(chunkPos)) {
 				loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
@@ -216,12 +228,12 @@ public class ServerWorldChunkManager {
 			return fetchedWorldChunk;
 		}
 
-		var fetchedChunk = ChunkSerializer.deserialize(serverWorld, pointOfInterestStorage, chunkPos, fetchedNbtData);
-		var fetchedWorldChunk = new WorldChunk(serverWorld, fetchedChunk,
-				chunkToAddEntitiesTo -> serverWorld.addEntities(EntityType.streamFromNbt(fetchedChunk.getEntities(), serverWorld))
+		var fetchedChunk = ChunkSerializer.read(serverWorld, pointOfInterestStorage, chunkPos, fetchedNbtData);
+		var fetchedWorldChunk = new LevelChunk(serverWorld, fetchedChunk,
+				chunkToAddEntitiesTo -> serverWorld.addWorldGenChunkEntities(EntityType.loadEntitiesRecursive(fetchedChunk.getEntities(), serverWorld))
 		);
-		syncRunnableConsumer.accept(() -> fetchedWorldChunk.addChunkTickSchedulers(serverWorld));
-		fetchedWorldChunk.loadEntities();
+		syncRunnableConsumer.accept(() -> fetchedWorldChunk.registerTickContainerInLevel(serverWorld));
+		fetchedWorldChunk.runPostLoad();
 
 		if (!unloadingWorldChunks.contains(chunkPos)) {
 			loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
@@ -244,15 +256,15 @@ public class ServerWorldChunkManager {
 	}
 
 	/**
-	 * Gets all {@link WorldChunk}s around the specified chunk, using a square radius.
+	 * Gets all {@link LevelChunk}s around the specified chunk, using a square radius.
 	 * This method is ran asynchronously.
 	 *
 	 * @param chunkPos The center {@link ChunkPos}.
 	 * @param radius   A square radius of chunks.
-	 * @return All the {@link WorldChunk}s around the specified chunk, using a square radius.
+	 * @return All the {@link LevelChunk}s around the specified chunk, using a square radius.
 	 */
-	public @NotNull Map<ChunkPos, CompletableFuture<WorldChunk>> getChunksInRadiusAsync(@NotNull ChunkPos chunkPos, int radius) {
-		@NotNull var chunks = new HashMap<ChunkPos, CompletableFuture<WorldChunk>>();
+	public @NotNull Map<ChunkPos, CompletableFuture<LevelChunk>> getChunksInRadiusAsync(@NotNull ChunkPos chunkPos, int radius) {
+		@NotNull var chunks = new HashMap<ChunkPos, CompletableFuture<LevelChunk>>();
 		for (int chunkPosX = chunkPos.x - radius; chunkPosX < chunkPos.x + radius; chunkPosX++) {
 			for (int chunkPosZ = chunkPos.z - radius; chunkPosZ < chunkPos.z + radius; chunkPosZ++) {
 				var chunkPosThatShouldBeLoaded = new ChunkPos(chunkPosX, chunkPosZ);
@@ -264,15 +276,15 @@ public class ServerWorldChunkManager {
 	}
 
 	/**
-	 * Gets all {@link WorldChunk}s around the specified chunk, using a square radius.
+	 * Gets all {@link LevelChunk}s around the specified chunk, using a square radius.
 	 * WARNING: This method blocks the server thread. Prefer using {@link ServerWorldChunkManager#getChunksInRadiusAsync(ChunkPos, int)} instead.
 	 *
 	 * @param chunkPos The center {@link ChunkPos}.
 	 * @param radius   A square radius of chunks.
-	 * @return All the {@link WorldChunk}s around the specified chunk, using a square radius.
+	 * @return All the {@link LevelChunk}s around the specified chunk, using a square radius.
 	 */
-	public @NotNull Map<@NotNull ChunkPos, @Nullable WorldChunk> getChunksInRadius(@NotNull ChunkPos chunkPos, int radius) {
-		var chunks = new HashMap<@NotNull ChunkPos, @Nullable WorldChunk>();
+	public @NotNull Map<@NotNull ChunkPos, @Nullable LevelChunk> getChunksInRadius(@NotNull ChunkPos chunkPos, int radius) {
+		var chunks = new HashMap<@NotNull ChunkPos, @Nullable LevelChunk>();
 
 		for (int chunkPosX = chunkPos.x - radius; chunkPosX < chunkPos.x + radius; chunkPosX++) {
 			for (int chunkPosZ = chunkPos.z - radius; chunkPosZ < chunkPos.z + radius; chunkPosZ++) {
@@ -298,32 +310,32 @@ public class ServerWorldChunkManager {
 		return this.loadedWorldChunks.containsKey(chunkPos);
 	}
 
-	public @NotNull NbtScannable getChunkIoWorker() {
-		return versionedChunkStorage.getWorker();
+	public @NotNull ChunkScanAccess getChunkIoWorker() {
+		return versionedChunkStorage.chunkScanner();
 	}
 
-	public @NotNull PersistentStateManager getPersistentStateManager() {
+	public @NotNull DimensionDataStorage getPersistentStateManager() {
 		return persistentStateManager;
 	}
 
 	// TODO: Move into the ServerLightingProvider
 
 	/**
-	 * Updates the chunk's lighting at the specified {@link ChunkSectionPos}.
+	 * Updates the chunk's lighting at the specified {@link SectionPos}.
 	 * This method is ran asynchronously.
 	 *
-	 * @param lightType            The {@link LightType} that should be updated for this {@link WorldChunk}.
-	 * @param chunkSectionPosition The {@link ChunkSectionPos} of the {@link WorldChunk}.
+	 * @param lightType            The {@link LightLayer} that should be updated for this {@link LevelChunk}.
+	 * @param chunkSectionPosition The {@link SectionPos} of the {@link LevelChunk}.
 	 */
-	private void onLightUpdateAsync(@NotNull LightType lightType, @NotNull ChunkSectionPos chunkSectionPosition) {
-		var lightingProvider = serverWorld.getLightingProvider();
-		int bottomY = lightingProvider.getBottomY();
-		var chunkSectionYPosition = chunkSectionPosition.getSectionY();
-		if (chunkSectionYPosition < bottomY || chunkSectionYPosition > lightingProvider.getTopY()) {
+	private void onLightUpdateAsync(@NotNull LightLayer lightType, @NotNull SectionPos chunkSectionPosition) {
+		var lightingProvider = serverWorld.getLightEngine();
+		int bottomY = lightingProvider.getMinLightSection();
+		var chunkSectionYPosition = chunkSectionPosition.y();
+		if (chunkSectionYPosition < bottomY || chunkSectionYPosition > lightingProvider.getMaxLightSection()) {
 			return;
 		}
 
-		var chunkPosition = chunkSectionPosition.toChunkPos();
+		var chunkPosition = chunkSectionPosition.chunk();
 		getChunkAsync(chunkPosition).whenCompleteAsync((worldChunk, throwable) -> {
 			var worldChunkExtension = (WorldChunkExtension) worldChunk;
 			var skyLightBits = worldChunkExtension.noisiumchunkmanager$getBlockLightBits();
@@ -332,27 +344,27 @@ public class ServerWorldChunkManager {
 
 			skyLightBits.clear();
 			blockLightBits.clear();
-			if (lightType == LightType.SKY) {
+			if (lightType == LightLayer.SKY) {
 				skyLightBits.set(chunkSectionYPositionDifference);
 			} else {
 				blockLightBits.set(chunkSectionYPositionDifference);
 			}
-			ChunkUtil.sendLightUpdateToPlayers(serverWorld.getPlayers(), lightingProvider, chunkPosition, skyLightBits, blockLightBits);
+			ChunkUtil.sendLightUpdateToPlayers(serverWorld.players(), lightingProvider, chunkPosition, skyLightBits, blockLightBits);
 		}, lightingThreadPoolExecutor);
 	}
 
 	// TODO: Check if this can be ran asynchronously
 	@SuppressWarnings("OptionalIsPresent")
 	private void onBlockChange(@NotNull BlockPos blockPos, @NotNull BlockState oldBlockState, @NotNull BlockState newBlockState) {
-		Optional<RegistryEntry<PointOfInterestType>> oldBlockStatePointOfInterestTypeOptional = PointOfInterestTypes.getTypeForState(
+		Optional<Holder<PoiType>> oldBlockStatePointOfInterestTypeOptional = PoiTypes.forState(
 				oldBlockState);
-		Optional<RegistryEntry<PointOfInterestType>> newBlockStatePointOfInterestTypeOptional = PointOfInterestTypes.getTypeForState(
+		Optional<Holder<PoiType>> newBlockStatePointOfInterestTypeOptional = PoiTypes.forState(
 				newBlockState);
 		if (oldBlockStatePointOfInterestTypeOptional.equals(newBlockStatePointOfInterestTypeOptional)) {
 			return;
 		}
 
-		BlockPos immutableBlockPos = blockPos.toImmutable();
+		BlockPos immutableBlockPos = blockPos.immutable();
 		if (oldBlockStatePointOfInterestTypeOptional.isPresent()) {
 			pointOfInterestStorage.remove(immutableBlockPos);
 			// TODO: Add sendPoiRemoval method call into DebugInfoSenderMixin using an event
@@ -363,9 +375,9 @@ public class ServerWorldChunkManager {
 		}
 	}
 
-	private @Nullable NbtCompound getNbtDataAtChunkPosition(ChunkPos chunkPos) {
+	private @Nullable CompoundTag getNbtDataAtChunkPosition(ChunkPos chunkPos) {
 		try {
-			var fetchedNbtCompoundOptionalFuture = versionedChunkStorage.getNbt(chunkPos).get();
+			var fetchedNbtCompoundOptionalFuture = versionedChunkStorage.read(chunkPos).get();
 			if (fetchedNbtCompoundOptionalFuture.isPresent()) {
 				return fetchedNbtCompoundOptionalFuture.get();
 			}
@@ -379,94 +391,94 @@ public class ServerWorldChunkManager {
 	// TODO: Move this into the constructor as a Supplier<ChunkPos, ProtoChunk>
 	private @NotNull ProtoChunk generateChunk(@NotNull ChunkPos chunkPos, @NotNull Function<ChunkPos, IoWorldChunk> ioWorldChunkGetFunction, @NotNull Function<ChunkPos, IoWorldChunk> ioWorldChunkRemoveFunction) {
 		// var serverLightingProvider = (ServerLightingProvider) serverWorld.getLightingProvider();
-		var protoChunk = new ProtoChunk(chunkPos, UpgradeData.NO_UPGRADE_DATA, serverWorld,
-				serverWorld.getRegistryManager().get(RegistryKeys.BIOME), null
+		var protoChunk = new ProtoChunk(chunkPos, UpgradeData.EMPTY, serverWorld,
+				serverWorld.registryAccess().registryOrThrow(Registries.BIOME), null
 		);
-		List<Chunk> chunkRegionChunks = List.of(protoChunk);
-		var chunkRegion = new ChunkRegion(serverWorld, chunkRegionChunks, ChunkStatus.FULL, 1);
-		var blender = Blender.getBlender(chunkRegion);
-		var chunkRegionStructureAccessor = serverWorld.getStructureAccessor().forRegion(chunkRegion);
+		List<ChunkAccess> chunkRegionChunks = List.of(protoChunk);
+		var chunkRegion = new WorldGenRegion(serverWorld, chunkRegionChunks, ChunkStatus.FULL, 1);
+		var blender = Blender.of(chunkRegion);
+		var chunkRegionStructureAccessor = serverWorld.structureManager().forWorldGenRegion(chunkRegion);
 
 		protoChunk.setStatus(ChunkStatus.STRUCTURE_STARTS);
 		// TODO: Move the structure placement calculator into NoisiumServerWorldChunkManager
 		// TODO: Pass the structure template manager into NoisiumServerWorldChunkManager
 		// TODO: Pass the shouldGenerateStructures boolean into NoisiumServerWorldChunkManager
-		if (serverWorld.getServer().getSaveProperties().getGeneratorOptions().shouldGenerateStructures()) {
-			chunkGenerator.setStructureStarts(
-					serverWorld.getRegistryManager(), serverWorld.getChunkManager().getStructurePlacementCalculator(),
-					chunkRegionStructureAccessor, protoChunk, serverWorld.getServer().getStructureTemplateManager()
+		if (serverWorld.getServer().getWorldData().worldGenOptions().generateStructures()) {
+			chunkGenerator.createStructures(
+					serverWorld.registryAccess(), serverWorld.getChunkSource().getGeneratorState(),
+					chunkRegionStructureAccessor, protoChunk, serverWorld.getServer().getStructureManager()
 			);
 		}
-		serverWorld.cacheStructures(protoChunk);
+		serverWorld.onStructureStartsAvailable(protoChunk);
 
 		protoChunk.setStatus(ChunkStatus.STRUCTURE_REFERENCES);
-		chunkGenerator.addStructureReferences(chunkRegion, chunkRegionStructureAccessor, protoChunk);
+		chunkGenerator.createReferences(chunkRegion, chunkRegionStructureAccessor, protoChunk);
 
 		protoChunk.setStatus(ChunkStatus.BIOMES);
-		protoChunk.populateBiomes(chunkGenerator.getBiomeSource(), noiseConfig.getMultiNoiseSampler());
+		protoChunk.fillBiomesFromNoise(chunkGenerator.getBiomeSource(), noiseConfig.sampler());
 
 		protoChunk.setStatus(ChunkStatus.NOISE);
-		GenerationShapeConfig generationShapeConfig = ((NoiseChunkGeneratorAccessor) chunkGenerator).getSettings().value().generationShapeConfig().trimHeight(protoChunk);
-		int minimumYCellHeightRemainder = Math.floorDiv(generationShapeConfig.minimumY(), generationShapeConfig.verticalCellBlockCount());
-		int chunkHeightCellHeightRemainder = Math.floorDiv(generationShapeConfig.height(), generationShapeConfig.verticalCellBlockCount());
-		protoChunk = (ProtoChunk) ((NoiseChunkGeneratorAccessor) chunkGenerator).invokePopulateNoise(blender, chunkRegionStructureAccessor, noiseConfig, protoChunk, minimumYCellHeightRemainder, chunkHeightCellHeightRemainder);
+		NoiseSettings generationShapeConfig = ((NoiseChunkGeneratorAccessor) chunkGenerator).getSettings().value().noiseSettings().clampToHeightAccessor(protoChunk);
+		int minimumYCellHeightRemainder = Math.floorDiv(generationShapeConfig.minY(), generationShapeConfig.getCellHeight());
+		int chunkHeightCellHeightRemainder = Math.floorDiv(generationShapeConfig.height(), generationShapeConfig.getCellHeight());
+		protoChunk = (ProtoChunk) ((NoiseChunkGeneratorAccessor) chunkGenerator).invokeDoFill(blender, chunkRegionStructureAccessor, noiseConfig, protoChunk, minimumYCellHeightRemainder, chunkHeightCellHeightRemainder);
 
 		protoChunk.setStatus(ChunkStatus.SURFACE);
 		chunkGenerator.buildSurface(chunkRegion, chunkRegionStructureAccessor, noiseConfig, protoChunk);
 
 		protoChunk.setStatus(ChunkStatus.CARVERS);
-		chunkGenerator.carve(
-				chunkRegion, chunkRegion.getSeed(), noiseConfig, chunkRegion.getBiomeAccess(), chunkRegionStructureAccessor, protoChunk,
-				GenerationStep.Carver.AIR
+		chunkGenerator.applyCarvers(
+				chunkRegion, chunkRegion.getSeed(), noiseConfig, chunkRegion.getBiomeManager(), chunkRegionStructureAccessor, protoChunk,
+				GenerationStep.Carving.AIR
 		);
 
 		protoChunk.setStatus(ChunkStatus.FEATURES);
-		Heightmap.populateHeightmaps(
+		Heightmap.primeHeightmaps(
 				protoChunk,
 				EnumSet.of(
-						Heightmap.Type.MOTION_BLOCKING, Heightmap.Type.MOTION_BLOCKING_NO_LEAVES,
-						Heightmap.Type.OCEAN_FLOOR, Heightmap.Type.WORLD_SURFACE
+						Heightmap.Types.MOTION_BLOCKING, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+						Heightmap.Types.OCEAN_FLOOR, Heightmap.Types.WORLD_SURFACE
 				)
 		);
-		chunkGenerator.generateFeatures(chunkRegion, protoChunk, chunkRegionStructureAccessor);
-		Blender.tickLeavesAndFluids(chunkRegion, protoChunk);
+		chunkGenerator.applyBiomeDecoration(chunkRegion, protoChunk, chunkRegionStructureAccessor);
+		Blender.generateBorderTicks(chunkRegion, protoChunk);
 
-		@NotNull var ioWorldChunkSectionArray = ioWorldChunkGetFunction.apply(chunkPos).getSectionArray();
+		@NotNull var ioWorldChunkSectionArray = ioWorldChunkGetFunction.apply(chunkPos).getSections();
 		for (int chunkSectionIndex = 0; chunkSectionIndex < ioWorldChunkSectionArray.length; chunkSectionIndex++) {
 			@NotNull var ioWorldChunkSection = ioWorldChunkSectionArray[chunkSectionIndex];
-			if (ioWorldChunkSection.isEmpty()) {
+			if (ioWorldChunkSection.hasOnlyAir()) {
 				continue;
 			}
 
-			@NotNull var ioWorldChunkSectionBlockStateContainer = ioWorldChunkSection.getBlockStateContainer();
-			ioWorldChunkSectionBlockStateContainer.lock();
+			@NotNull var ioWorldChunkSectionBlockStateContainer = ioWorldChunkSection.getStates();
+			ioWorldChunkSectionBlockStateContainer.acquire();
 
-			@NotNull var protoChunkSectionBlockStateContainer = protoChunk.getSectionArray()[chunkSectionIndex].getBlockStateContainer();
-			protoChunkSectionBlockStateContainer.lock();
+			@NotNull var protoChunkSectionBlockStateContainer = protoChunk.getSections()[chunkSectionIndex].getStates();
+			protoChunkSectionBlockStateContainer.acquire();
 
 			@NotNull var protoChunkPalettedContainerData = protoChunkSectionBlockStateContainer.data;
 			@NotNull var protoChunkPaletteStorage = protoChunkPalettedContainerData.storage();
 			@NotNull var ioWorldChunkPalettedContainerData = ioWorldChunkSectionBlockStateContainer.data;
 			@NotNull var ioWorldChunkPaletteStorage = ioWorldChunkPalettedContainerData.storage();
 			var ioWorldChunkPaletteStorageSize = ioWorldChunkPaletteStorage.getSize();
-			if (protoChunkPaletteStorage.getData().length == 0) {
-				protoChunkPaletteStorage = new PackedIntegerArray(
-						ioWorldChunkPaletteStorage.getElementBits(), ioWorldChunkPaletteStorageSize);
+			if (protoChunkPaletteStorage.getRaw().length == 0) {
+				protoChunkPaletteStorage = new SimpleBitStorage(
+						ioWorldChunkPaletteStorage.getBits(), ioWorldChunkPaletteStorageSize);
 			}
 
 			for (int blockIndex = 0; blockIndex < ioWorldChunkPaletteStorageSize; blockIndex++) {
-				@NotNull var blockState = ioWorldChunkPalettedContainerData.palette().get(ioWorldChunkPaletteStorage.get(blockIndex));
-				var blockStatePaletteValue = protoChunkPalettedContainerData.palette.index(blockState);
-				if (blockState.equals(Blocks.AIR.getDefaultState())
-						|| blockStatePaletteValue > ((PackedIntegerArrayAccessor) protoChunkPaletteStorage).getMaxValue()) {
+				@NotNull var blockState = ioWorldChunkPalettedContainerData.palette().valueFor(ioWorldChunkPaletteStorage.get(blockIndex));
+				var blockStatePaletteValue = protoChunkPalettedContainerData.palette().idFor(blockState);
+				if (blockState.equals(Blocks.AIR.defaultBlockState())
+						|| blockStatePaletteValue > ((PackedIntegerArrayAccessor) protoChunkPaletteStorage).getMask()) {
 					continue;
 				}
 
-				protoChunkPaletteStorage.set(blockIndex, blockStatePaletteValue);
+				protoChunkPaletteStorage.getAndSet(blockIndex, blockStatePaletteValue);
 			}
 
-			ioWorldChunkSectionBlockStateContainer.unlock();
-			protoChunkSectionBlockStateContainer.unlock();
+			ioWorldChunkSectionBlockStateContainer.release();
+			protoChunkSectionBlockStateContainer.release();
 		}
 
 		ioWorldChunkRemoveFunction.apply(chunkPos);
@@ -479,7 +491,7 @@ public class ServerWorldChunkManager {
 		// serverLightingProvider.light(protoChunk, protoChunk.isLightOn());
 
 		protoChunk.setStatus(ChunkStatus.SPAWN);
-		chunkGenerator.populateEntities(chunkRegion);
+		chunkGenerator.spawnOriginalMobs(chunkRegion);
 
 		protoChunk.setStatus(ChunkStatus.FULL);
 		// pointOfInterestStorage.saveChunk(chunkPos);

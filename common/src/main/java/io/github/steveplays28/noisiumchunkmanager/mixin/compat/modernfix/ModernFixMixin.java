@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(value = ModernFix.class, remap = false)
 public class ModernFixMixin {
 	/**
-	 * Prevents ModernFix from trying to access {@link net.minecraft.server.world.ThreadedAnvilChunkStorage}.
+	 * Prevents ModernFix from trying to access {@link net.minecraft.server.level.ChunkMap}.
 	 *
 	 * @param server The Minecraft server.
 	 * @param ci     The {@link CallbackInfo} for this mixin injection.

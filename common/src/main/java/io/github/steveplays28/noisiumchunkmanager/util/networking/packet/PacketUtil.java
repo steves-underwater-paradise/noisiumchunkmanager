@@ -1,10 +1,10 @@
 package io.github.steveplays28.noisiumchunkmanager.util.networking.packet;
 
-import net.minecraft.network.packet.Packet;
-import net.minecraft.server.network.ServerPlayerEntity;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.server.level.ServerPlayer;
 
 public class PacketUtil {
 	/**
@@ -14,9 +14,9 @@ public class PacketUtil {
 	 * @param packet  The {@link Packet} that should be sent to the {@link List} of players.
 	 */
 	@SuppressWarnings("ForLoopReplaceableByForEach")
-	public static void sendPacketToPlayers(@NotNull List<ServerPlayerEntity> players, @NotNull Packet<?> packet) {
+	public static void sendPacketToPlayers(@NotNull List<ServerPlayer> players, @NotNull Packet<?> packet) {
 		for (int i = 0; i < players.size(); i++) {
-			players.get(i).networkHandler.sendPacket(packet);
+			players.get(i).connection.send(packet);
 		}
 	}
 }

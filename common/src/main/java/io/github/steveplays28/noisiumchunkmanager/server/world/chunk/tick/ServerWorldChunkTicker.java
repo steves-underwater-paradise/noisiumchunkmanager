@@ -2,21 +2,21 @@ package io.github.steveplays28.noisiumchunkmanager.server.world.chunk.tick;
 
 import dev.architectury.event.events.common.TickEvent;
 import io.github.steveplays28.noisiumchunkmanager.server.event.world.chunk.ServerChunkEvent;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.world.GameRules;
-import net.minecraft.world.chunk.WorldChunk;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.GameRules;
+import net.minecraft.world.level.chunk.LevelChunk;
 
 public class ServerWorldChunkTicker {
-	private final @NotNull ServerWorld serverWorld;
+	private final @NotNull ServerLevel serverWorld;
 	private final @NotNull List<ChunkPos> loadedChunkPositions;
 
-	public ServerWorldChunkTicker(@NotNull ServerWorld serverWorld) {
+	public ServerWorldChunkTicker(@NotNull ServerLevel serverWorld) {
 		this.serverWorld = serverWorld;
 
 		this.loadedChunkPositions = new ArrayList<>();
@@ -44,7 +44,7 @@ public class ServerWorldChunkTicker {
 		});
 	}
 
-	private void onWorldChunkLoaded(@NotNull WorldChunk worldChunk) {
+	private void onWorldChunkLoaded(@NotNull LevelChunk worldChunk) {
 		loadedChunkPositions.add(worldChunk.getPos());
 	}
 
@@ -63,7 +63,7 @@ public class ServerWorldChunkTicker {
 			// TODO: Re-use ChunkPos via a new getChunk(ChunkPos) method in ServerWorldExtension
 			serverWorld.tickChunk(
 					serverWorld.getChunk(loadedChunkPosition.x, loadedChunkPosition.z),
-					serverWorld.getGameRules().getInt(GameRules.RANDOM_TICK_SPEED)
+					serverWorld.getGameRules().getInt(GameRules.RULE_RANDOMTICKING)
 			);
 		}
 	}

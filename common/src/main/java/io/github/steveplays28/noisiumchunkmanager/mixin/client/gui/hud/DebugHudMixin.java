@@ -3,10 +3,10 @@ package io.github.steveplays28.noisiumchunkmanager.mixin.client.gui.hud;
 import io.github.steveplays28.noisiumchunkmanager.server.extension.world.ServerWorldExtension;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.gui.hud.DebugHud;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.client.gui.components.DebugScreenOverlay;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.LevelChunk;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
@@ -16,20 +16,20 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Environment(EnvType.CLIENT)
-@Mixin(DebugHud.class)
+@Mixin(DebugScreenOverlay.class)
 public abstract class DebugHudMixin {
 	@Shadow
 	@Nullable
-	protected abstract ServerWorld getServerWorld();
+	protected abstract ServerLevel getServerLevel();
 
 	@Shadow
 	@Nullable
-	private ChunkPos pos;
+	private ChunkPos lastPos;
 
-	@Inject(method = "getChunk", at = @At(value = "HEAD"), cancellable = true)
-	private void noisiumchunkmanager$getChunkFromNoisiumServerWorldChunkManager(CallbackInfoReturnable<WorldChunk> cir) {
-		@Nullable var serverWorld = this.getServerWorld();
-		@Nullable var playerChunkPosition = this.pos;
+	@Inject(method = "getServerChunk", at = @At(value = "HEAD"), cancellable = true)
+	private void noisiumchunkmanager$getChunkFromNoisiumServerWorldChunkManager(CallbackInfoReturnable<LevelChunk> cir) {
+		@Nullable var serverWorld = this.getServerLevel();
+		@Nullable var playerChunkPosition = this.lastPos;
 		if (serverWorld == null || playerChunkPosition == null) {
 			cir.setReturnValue(null);
 			return;
