@@ -171,8 +171,8 @@ public class ServerWorldChunkManager {
 				return;
 			}
 
-			// syncRunnableConsumer.accept(() -> fetchedWorldChunk.addChunkTickSchedulers(serverWorld));
-			// fetchedWorldChunk.loadEntities();
+			syncRunnableConsumer.accept(() -> fetchedWorldChunk.registerTickContainerInLevel(serverWorld));
+			fetchedWorldChunk.runPostLoad();
 			loadingWorldChunks.remove(chunkPos);
 
 			if (!unloadingWorldChunks.contains(chunkPos)) {
