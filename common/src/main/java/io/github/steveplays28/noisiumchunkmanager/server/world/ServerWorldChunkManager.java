@@ -13,8 +13,6 @@ import io.github.steveplays28.noisiumchunkmanager.util.world.chunk.ChunkUtil;
 import io.github.steveplays28.noisiumchunkmanager.mixin.accessor.util.collection.PackedIntegerArrayAccessor;
 import io.github.steveplays28.noisiumchunkmanager.mixin.accessor.world.gen.chunk.NoiseChunkGeneratorAccessor;
 import io.github.steveplays28.noisiumchunkmanager.world.chunk.IoWorldChunk;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Holder;
 import net.minecraft.core.SectionPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
@@ -25,13 +23,10 @@ import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.util.SimpleBitStorage;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.ai.village.poi.PoiManager;
-import net.minecraft.world.entity.ai.village.poi.PoiType;
-import net.minecraft.world.entity.ai.village.poi.PoiTypes;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LightLayer;
 
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.ChunkSource;
@@ -114,7 +109,6 @@ public class ServerWorldChunkManager {
 		this.loadedWorldChunks = new HashMap<>();
 
 		// ServerChunkEvent.LIGHT_UPDATE.register(this::onLightUpdateAsync);
-		ServerChunkEvent.BLOCK_CHANGE.register(this::onBlockChange);
 		TickEvent.SERVER_LEVEL_POST.register(instance -> {
 			if (!instance.equals(serverWorld) || instance.players().isEmpty()) {
 				return;
@@ -163,7 +157,7 @@ public class ServerWorldChunkManager {
 				return new LevelChunk(serverWorld, generateChunk(chunkPos, this::getIoWorldChunk, ioWorldChunks::remove), null);
 			}
 
-			versionedChunkStorage.upgradeChunkTag(
+			fetchedNbtData = versionedChunkStorage.upgradeChunkTag(
 					serverWorld.dimension(), () -> persistentStateManager, fetchedNbtData, this.chunkGenerator.getTypeNameForDataFixer());
 			var fetchedChunk = ChunkSerializer.read(serverWorld, pointOfInterestStorage, chunkPos, fetchedNbtData);
 			return new LevelChunk(serverWorld, fetchedChunk,
@@ -185,6 +179,7 @@ public class ServerWorldChunkManager {
 				loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
 			}
 
+			// TODO: Run `serverLevel.getProfiler().incrementCounter("chunkLoad");` on the ServerChunkEvent.WORLD_CHUNK_LOADED event
 			// syncRunnableConsumer.accept(
 					// () -> ServerChunkEvent.WORLD_CHUNK_LOADED.invoker().onWorldChunkLoaded(serverWorld, fetchedWorldChunk));
 			// unloadingWorldChunks.remove(chunkPos);
@@ -229,6 +224,8 @@ public class ServerWorldChunkManager {
 			return fetchedWorldChunk;
 		}
 
+		fetchedNbtData = versionedChunkStorage.upgradeChunkTag(
+				serverWorld.dimension(), () -> persistentStateManager, fetchedNbtData, this.chunkGenerator.getTypeNameForDataFixer());
 		var fetchedChunk = ChunkSerializer.read(serverWorld, pointOfInterestStorage, chunkPos, fetchedNbtData);
 		var fetchedWorldChunk = new LevelChunk(serverWorld, fetchedChunk,
 				chunkToAddEntitiesTo -> serverWorld.addWorldGenChunkEntities(EntityType.loadEntitiesRecursive(fetchedChunk.getEntities(), serverWorld))
@@ -240,6 +237,7 @@ public class ServerWorldChunkManager {
 			loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
 		}
 
+		// TODO: Run `serverLevel.getProfiler().incrementCounter("chunkLoad");` on the ServerChunkEvent.WORLD_CHUNK_LOADED event
 		syncRunnableConsumer.accept(() -> ServerChunkEvent.WORLD_CHUNK_LOADED.invoker().onWorldChunkLoaded(serverWorld, fetchedWorldChunk));
 		unloadingWorldChunks.remove(chunkPos);
 		syncRunnableConsumer.accept(() -> ServerChunkEvent.WORLD_CHUNK_UNLOADED.invoker().onWorldChunkUnloaded(serverWorld, chunkPos));
@@ -360,7 +358,7 @@ public class ServerWorldChunkManager {
 
 	private @Nullable CompoundTag getNbtDataAtChunkPosition(ChunkPos chunkPos) {
 		try {
-			var fetchedNbtCompoundOptionalFuture = versionedChunkStorage.read(chunkPos).get();
+			var fetchedNbtCompoundOptionalFuture = versionedChunkStorage.read(chunkPos).join();
 			if (fetchedNbtCompoundOptionalFuture.isPresent()) {
 				return fetchedNbtCompoundOptionalFuture.get();
 			}
@@ -480,9 +478,12 @@ public class ServerWorldChunkManager {
 		chunkGenerator.spawnOriginalMobs(chunkRegion);
 
 		protoChunk.setStatus(ChunkStatus.FULL);
+		pointOfInterestStorage.flush(chunkPos);
+		protoChunk.setUnsaved(false);
 		versionedChunkStorage.write(chunkPos, ChunkSerializer.write(serverWorld, protoChunk));
 		// TODO: Add a (Neo)Forge ChunkDataEvent.Save invoker
 		//  Also add a Fabric/Architectury chunk save event invoker
+		//  and run `serverLevel.getProfiler().incrementCounter("chunkSave");` on the chunk save event
 		return protoChunk;
 	}
 }
