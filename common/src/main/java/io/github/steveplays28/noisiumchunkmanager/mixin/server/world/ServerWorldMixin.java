@@ -20,6 +20,7 @@ import net.minecraft.server.level.progress.ChunkProgressListener;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.RandomSequences;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ai.village.poi.PoiManager;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkGenerator;
@@ -163,6 +164,11 @@ public abstract class ServerWorldMixin implements ServerWorldExtension {
 	private void noisiumchunkmanager$getPersistentStateManagerFromNoisiumServerWorldChunkManager(@NotNull CallbackInfoReturnable<DimensionDataStorage> cir) {
 		cir.setReturnValue(((ServerWorldExtension) this).noisiumchunkmanager$getServerWorldChunkManager().getPersistentStateManager());
 	}
+	
+	@Inject(method = "getPoiManager", at = @At(value = "HEAD"), cancellable = true)
+	private void noisiumchunkmanager$getPointOfInterestManagerFromNoisiumServerWorldChunkManager(@NotNull CallbackInfoReturnable<PoiManager> cir) {
+		cir.setReturnValue(((ServerWorldExtension) this).noisiumchunkmanager$getServerWorldChunkManager().getPointOfInterestManager());
+	}
 
 	@Inject(method = "isPositionTickingWithEntitiesLoaded", at = @At(value = "HEAD"), cancellable = true)
 	private void noisiumchunkmanager$checkIfTickingFutureIsReadyByCheckingIfTheChunkIsLoaded(long chunkPos, @NotNull CallbackInfoReturnable<Boolean> cir) {
@@ -189,12 +195,6 @@ public abstract class ServerWorldMixin implements ServerWorldExtension {
 		profiler.push("tick");
 		this.tickNonPassenger(entity);
 		profiler.pop();
-		ci.cancel();
-	}
-
-	@Inject(method = "onBlockStateChange", at = @At(value = "HEAD"), cancellable = true)
-	private void noisiumchunkmanager$redirectOnBlockChangedToNoisiumServerWorldChunkManager(BlockPos blockPos, BlockState oldBlockState, BlockState newBlockState, CallbackInfo ci) {
-		ServerChunkEvent.BLOCK_CHANGE.invoker().onBlockChange(blockPos, oldBlockState, newBlockState);
 		ci.cancel();
 	}
 

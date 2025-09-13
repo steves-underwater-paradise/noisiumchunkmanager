@@ -29,7 +29,7 @@
     "world.gen.chunk.ChunkGeneratorMixin",
     "world.gen.chunk.NoiseChunkGeneratorMixin",
     "world.gen.feature.OreFeatureMixin",
-    "world.storage.SerializingRegionBasedStorageMixin"
+    "world.storage.SectionStorageMixin"
   ],
   "client": [
     "client.gui.hud.DebugHudMixin"

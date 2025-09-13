@@ -7,6 +7,7 @@ import dev.architectury.event.events.common.TickEvent;
 import io.github.steveplays28.noisiumchunkmanager.NoisiumChunkManager;
 import io.github.steveplays28.noisiumchunkmanager.config.NoisiumChunkManagerConfig;
 import io.github.steveplays28.noisiumchunkmanager.extension.world.chunk.WorldChunkExtension;
+import io.github.steveplays28.noisiumchunkmanager.extension.world.level.chunk.storage.SectionStorageExtension;
 import io.github.steveplays28.noisiumchunkmanager.server.event.world.chunk.ServerChunkEvent;
 import io.github.steveplays28.noisiumchunkmanager.util.world.chunk.ChunkUtil;
 import io.github.steveplays28.noisiumchunkmanager.mixin.accessor.util.collection.PackedIntegerArrayAccessor;
@@ -318,6 +319,10 @@ public class ServerWorldChunkManager {
 		return persistentStateManager;
 	}
 
+	public @NotNull PoiManager getPointOfInterestManager() {
+		return pointOfInterestStorage;
+	}
+
 	// TODO: Move into the ServerLightingProvider
 
 	/**
@@ -353,28 +358,6 @@ public class ServerWorldChunkManager {
 		}, lightingThreadPoolExecutor);
 	}
 
-	// TODO: Check if this can be ran asynchronously
-	@SuppressWarnings("OptionalIsPresent")
-	private void onBlockChange(@NotNull BlockPos blockPos, @NotNull BlockState oldBlockState, @NotNull BlockState newBlockState) {
-		Optional<Holder<PoiType>> oldBlockStatePointOfInterestTypeOptional = PoiTypes.forState(
-				oldBlockState);
-		Optional<Holder<PoiType>> newBlockStatePointOfInterestTypeOptional = PoiTypes.forState(
-				newBlockState);
-		if (oldBlockStatePointOfInterestTypeOptional.equals(newBlockStatePointOfInterestTypeOptional)) {
-			return;
-		}
-
-		BlockPos immutableBlockPos = blockPos.immutable();
-		if (oldBlockStatePointOfInterestTypeOptional.isPresent()) {
-			pointOfInterestStorage.remove(immutableBlockPos);
-			// TODO: Add sendPoiRemoval method call into DebugInfoSenderMixin using an event
-		}
-		if (newBlockStatePointOfInterestTypeOptional.isPresent()) {
-			pointOfInterestStorage.add(immutableBlockPos, newBlockStatePointOfInterestTypeOptional.get());
-			// TODO: Add sendPoiRemoval method call into DebugInfoSenderMixin using an event
-		}
-	}
-
 	private @Nullable CompoundTag getNbtDataAtChunkPosition(ChunkPos chunkPos) {
 		try {
 			var fetchedNbtCompoundOptionalFuture = versionedChunkStorage.read(chunkPos).get();
@@ -398,7 +381,10 @@ public class ServerWorldChunkManager {
 		var chunkRegion = new WorldGenRegion(serverWorld, chunkRegionChunks, ChunkStatus.FULL, 1);
 		var blender = Blender.of(chunkRegion);
 		var chunkRegionStructureAccessor = serverWorld.structureManager().forWorldGenRegion(chunkRegion);
-
+		for (int sectionYPosition = protoChunk.getMinSection(); sectionYPosition < protoChunk.getMaxSection(); sectionYPosition++) {
+			((SectionStorageExtension) pointOfInterestStorage).noisiumchunkmanager$createPointOfInterestSection(SectionPos.asLong(chunkPos.x, sectionYPosition, chunkPos.z));
+		}
+		
 		protoChunk.setStatus(ChunkStatus.STRUCTURE_STARTS);
 		// TODO: Move the structure placement calculator into NoisiumServerWorldChunkManager
 		// TODO: Pass the structure template manager into NoisiumServerWorldChunkManager
@@ -494,8 +480,7 @@ public class ServerWorldChunkManager {
 		chunkGenerator.spawnOriginalMobs(chunkRegion);
 
 		protoChunk.setStatus(ChunkStatus.FULL);
-		// pointOfInterestStorage.saveChunk(chunkPos);
-		// versionedChunkStorage.setNbt(chunkPos, ChunkSerializer.serialize(serverWorld, protoChunk));
+		versionedChunkStorage.write(chunkPos, ChunkSerializer.write(serverWorld, protoChunk));
 		// TODO: Add a (Neo)Forge ChunkDataEvent.Save invoker
 		//  Also add a Fabric/Architectury chunk save event invoker
 		return protoChunk;

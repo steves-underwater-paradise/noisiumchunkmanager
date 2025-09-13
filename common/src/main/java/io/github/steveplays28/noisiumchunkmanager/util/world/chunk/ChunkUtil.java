@@ -26,14 +26,15 @@ public class ChunkUtil {
 	 * Sends a {@link LevelChunk} to all players in the specified world.
 	 * WARNING: This method blocks the server thread. Prefer using {@link ChunkUtil#sendWorldChunkToPlayerAsync(ServerLevel, CompletableFuture, Executor)} instead.
 	 *
-	 * @param serverWorld The world the {@link LevelChunk} resides in.
+	 * @param serverLevel The world the {@link LevelChunk} resides in.
 	 * @param worldChunk  The {@link LevelChunk}.
 	 */
-	public static void sendWorldChunkToPlayer(@NotNull ServerLevel serverWorld, @NotNull LevelChunk worldChunk) {
+	public static void sendWorldChunkToPlayer(@NotNull ServerLevel serverLevel, @NotNull LevelChunk worldChunk) {
 		try {
-			var chunkDataS2CPacket = new ClientboundLevelChunkWithLightPacket(worldChunk, serverWorld.getLightEngine(), null, null);
-			for (int i = 0; i < serverWorld.players().size(); i++) {
-				serverWorld.players().get(i).trackChunk(worldChunk.getPos(), chunkDataS2CPacket);
+			var chunkLightSectionCount = serverLevel.getLightEngine().getLightSectionCount();
+			var chunkDataS2CPacket = new ClientboundLevelChunkWithLightPacket(worldChunk, serverLevel.getLightEngine(), new BitSet(chunkLightSectionCount), new BitSet(chunkLightSectionCount));
+			for (int i = 0; i < serverLevel.players().size(); i++) {
+				serverLevel.players().get(i).trackChunk(worldChunk.getPos(), chunkDataS2CPacket);
 			}
 		} catch (ReportedException e) {
 			NoisiumChunkManager.LOGGER.error(

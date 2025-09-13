@@ -3,12 +3,10 @@ package io.github.steveplays28.noisiumchunkmanager.server.event.world.chunk;
 import dev.architectury.event.Event;
 import dev.architectury.event.EventFactory;
 import io.github.steveplays28.noisiumchunkmanager.server.world.ServerWorldChunkManager;
-import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LightLayer;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import org.jetbrains.annotations.NotNull;
 
@@ -25,10 +23,6 @@ public interface ServerChunkEvent {
 	 * @see LightUpdate
 	 */
 	Event<LightUpdate> LIGHT_UPDATE = EventFactory.createLoop();
-	/**
-	 * @see BlockChange
-	 */
-	Event<BlockChange> BLOCK_CHANGE = EventFactory.createLoop();
 
 	@FunctionalInterface
 	interface WorldChunkLoaded {
@@ -61,17 +55,5 @@ public interface ServerChunkEvent {
 		 * @param chunkSectionPosition The {@link SectionPos} of the {@link LevelChunk}.
 		 */
 		void onLightUpdate(@NotNull LightLayer lightType, @NotNull SectionPos chunkSectionPosition);
-	}
-
-	@FunctionalInterface
-	interface BlockChange {
-		/**
-		 * Invoked before a {@link LevelChunk} has had a block change processed by {@link ServerWorldChunkManager}.
-		 *
-		 * @param blockPos      The {@link BlockPos} where the block change has happened.
-		 * @param oldBlockState The old {@link BlockState} at the {@link BlockPos}.
-		 * @param newBlockState The new {@link BlockState} at the {@link BlockPos}.
-		 */
-		void onBlockChange(@NotNull BlockPos blockPos, @NotNull BlockState oldBlockState, @NotNull BlockState newBlockState);
 	}
 }
