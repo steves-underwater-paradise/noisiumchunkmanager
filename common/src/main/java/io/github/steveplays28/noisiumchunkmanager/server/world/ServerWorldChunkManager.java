@@ -108,13 +108,13 @@ public class ServerWorldChunkManager {
 		this.ioWorldChunks = new ConcurrentHashMap<>();
 		this.loadedWorldChunks = new HashMap<>();
 
-		// ServerChunkEvent.LIGHT_UPDATE.register(this::onLightUpdateAsync);
+		ServerChunkEvent.LIGHT_UPDATE.register(this::onLightUpdateAsync);
 		TickEvent.SERVER_LEVEL_POST.register(instance -> {
 			if (!instance.equals(serverWorld) || instance.players().isEmpty()) {
 				return;
 			}
 
-			// ((ServerLightingProvider) serverWorld.getLightingProvider()).tick();
+			((ThreadedLevelLightEngine) serverWorld.getLightEngine()).tryScheduleUpdate();
 			pointOfInterestStorage.tick(() -> true);
 			NoisiumChunkManager.LOGGER.info("Loading {} chunks.", loadingWorldChunks.size());
 		});
@@ -344,9 +344,6 @@ public class ServerWorldChunkManager {
 			var skyLightBits = worldChunkExtension.noisiumchunkmanager$getBlockLightBits();
 			var blockLightBits = worldChunkExtension.noisiumchunkmanager$getSkyLightBits();
 			int chunkSectionYPositionDifference = chunkSectionYPosition - bottomY;
-
-			skyLightBits.clear();
-			blockLightBits.clear();
 			if (lightType == LightLayer.SKY) {
 				skyLightBits.set(chunkSectionYPositionDifference);
 			} else {
@@ -371,7 +368,7 @@ public class ServerWorldChunkManager {
 
 	// TODO: Move this into the constructor as a Supplier<ChunkPos, ProtoChunk>
 	private @NotNull ProtoChunk generateChunk(@NotNull ChunkPos chunkPos, @NotNull Function<ChunkPos, IoWorldChunk> ioWorldChunkGetFunction, @NotNull Function<ChunkPos, IoWorldChunk> ioWorldChunkRemoveFunction) {
-		// var serverLightingProvider = (ServerLightingProvider) serverWorld.getLightingProvider();
+		var serverLightingProvider = (ThreadedLevelLightEngine) serverWorld.getLightEngine();
 		var protoChunk = new ProtoChunk(chunkPos, UpgradeData.EMPTY, serverWorld,
 				serverWorld.registryAccess().registryOrThrow(Registries.BIOME), null
 		);
@@ -467,12 +464,12 @@ public class ServerWorldChunkManager {
 
 		ioWorldChunkRemoveFunction.apply(chunkPos);
 
-		// protoChunk.setStatus(ChunkStatus.INITIALIZE_LIGHT);
-		// protoChunk.refreshSurfaceY();
-		// serverLightingProvider.initializeLight(protoChunk, protoChunk.isLightOn());
+		protoChunk.setStatus(ChunkStatus.INITIALIZE_LIGHT);
+		protoChunk.initializeLightSources();
+		serverLightingProvider.initializeLight(protoChunk, protoChunk.isLightCorrect());
 
-		// protoChunk.setStatus(ChunkStatus.LIGHT);
-		// serverLightingProvider.light(protoChunk, protoChunk.isLightOn());
+		protoChunk.setStatus(ChunkStatus.LIGHT);
+		serverLightingProvider.lightChunk(protoChunk, protoChunk.isLightCorrect());
 
 		protoChunk.setStatus(ChunkStatus.SPAWN);
 		chunkGenerator.spawnOriginalMobs(chunkRegion);
