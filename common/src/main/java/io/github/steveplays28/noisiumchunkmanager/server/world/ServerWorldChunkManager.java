@@ -17,7 +17,6 @@ import net.minecraft.core.SectionPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ThreadedLevelLightEngine;
 import net.minecraft.server.level.WorldGenRegion;
 
 import net.minecraft.util.SimpleBitStorage;
@@ -38,12 +37,13 @@ import net.minecraft.world.level.chunk.UpgradeData;
 import net.minecraft.world.level.chunk.storage.ChunkScanAccess;
 import net.minecraft.world.level.chunk.storage.ChunkSerializer;
 import net.minecraft.world.level.chunk.storage.ChunkStorage;
+
 import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.NoiseSettings;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.blending.Blender;
-
+import net.minecraft.world.level.lighting.LevelLightEngine;
 import net.minecraft.world.level.storage.DimensionDataStorage;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.jetbrains.annotations.NotNull;
@@ -114,13 +114,13 @@ public class ServerWorldChunkManager {
 				return;
 			}
 
-			((ThreadedLevelLightEngine) serverWorld.getLightEngine()).tryScheduleUpdate();
+			// serverWorld.getLightEngine().runLightUpdates();
 			pointOfInterestStorage.tick(() -> true);
 			NoisiumChunkManager.LOGGER.info("Loading {} chunks.", loadingWorldChunks.size());
 		});
 		LifecycleEvent.SERVER_STOPPING.register(instance -> {
 			this.isStopping = true;
-			((ThreadedLevelLightEngine) serverWorld.getLightEngine()).close();
+			// ((LevelLightEngine) serverWorld.getLightEngine()).close();
 			for (var loadingWorldChunkCompletableFuture : loadingWorldChunks.values()) {
 				loadingWorldChunkCompletableFuture.cancel(true);
 			}
@@ -201,6 +201,9 @@ public class ServerWorldChunkManager {
 		if (isStopping) {
 			throw new IllegalStateException(String.format("Can't get chunk because %s Server World Chunk Manager is stopping.", MOD_NAME));
 		}
+
+		// NoisiumChunkManager.LOGGER.info("Getting chunk at ({}, {}) in dimension {}.", chunkPos.x, chunkPos.z, this.serverWorld.dimensionType().effectsLocation());
+		// NoisiumChunkManager.LOGGER.info("", new Throwable());
 
 		if (loadedWorldChunks.containsKey(chunkPos)) {
 			return loadedWorldChunks.get(chunkPos);
@@ -331,6 +334,7 @@ public class ServerWorldChunkManager {
 	 * @param chunkSectionPosition The {@link SectionPos} of the {@link LevelChunk}.
 	 */
 	private void onLightUpdateAsync(@NotNull LightLayer lightType, @NotNull SectionPos chunkSectionPosition) {
+		// NoisiumChunkManager.LOGGER.info("light update at {}", chunkSectionPosition);
 		var lightingProvider = serverWorld.getLightEngine();
 		int bottomY = lightingProvider.getMinLightSection();
 		var chunkSectionYPosition = chunkSectionPosition.y();
@@ -368,7 +372,7 @@ public class ServerWorldChunkManager {
 
 	// TODO: Move this into the constructor as a Supplier<ChunkPos, ProtoChunk>
 	private @NotNull ProtoChunk generateChunk(@NotNull ChunkPos chunkPos, @NotNull Function<ChunkPos, IoWorldChunk> ioWorldChunkGetFunction, @NotNull Function<ChunkPos, IoWorldChunk> ioWorldChunkRemoveFunction) {
-		var serverLightingProvider = (ThreadedLevelLightEngine) serverWorld.getLightEngine();
+		// var serverLightingProvider = serverWorld.getLightEngine();
 		var protoChunk = new ProtoChunk(chunkPos, UpgradeData.EMPTY, serverWorld,
 				serverWorld.registryAccess().registryOrThrow(Registries.BIOME), null
 		);
@@ -465,19 +469,19 @@ public class ServerWorldChunkManager {
 		ioWorldChunkRemoveFunction.apply(chunkPos);
 
 		protoChunk.setStatus(ChunkStatus.INITIALIZE_LIGHT);
-		protoChunk.initializeLightSources();
-		serverLightingProvider.initializeLight(protoChunk, protoChunk.isLightCorrect());
+		// protoChunk.initializeLightSources();
+		// serverLightingProvider.initializeLight(protoChunk, protoChunk.isLightCorrect());
 
 		protoChunk.setStatus(ChunkStatus.LIGHT);
-		serverLightingProvider.lightChunk(protoChunk, protoChunk.isLightCorrect());
+		// serverLightingProvider.lightChunk(protoChunk, protoChunk.isLightCorrect());
 
 		protoChunk.setStatus(ChunkStatus.SPAWN);
-		chunkGenerator.spawnOriginalMobs(chunkRegion);
+		// chunkGenerator.spawnOriginalMobs(chunkRegion);
 
 		protoChunk.setStatus(ChunkStatus.FULL);
-		pointOfInterestStorage.flush(chunkPos);
-		protoChunk.setUnsaved(false);
-		versionedChunkStorage.write(chunkPos, ChunkSerializer.write(serverWorld, protoChunk));
+		// pointOfInterestStorage.flush(chunkPos);
+		// protoChunk.setUnsaved(false);
+		// versionedChunkStorage.write(chunkPos, ChunkSerializer.write(serverWorld, protoChunk));
 		// TODO: Add a (Neo)Forge ChunkDataEvent.Save invoker
 		//  Also add a Fabric/Architectury chunk save event invoker
 		//  and run `serverLevel.getProfiler().incrementCounter("chunkSave");` on the chunk save event

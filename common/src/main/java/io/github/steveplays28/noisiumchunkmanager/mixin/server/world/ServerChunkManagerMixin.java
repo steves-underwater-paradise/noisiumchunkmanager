@@ -1,5 +1,7 @@
 package io.github.steveplays28.noisiumchunkmanager.mixin.server.world;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.datafixers.DataFixer;
 import io.github.steveplays28.noisiumchunkmanager.server.extension.world.ServerWorldExtension;
 import io.github.steveplays28.noisiumchunkmanager.server.event.world.ticket.ServerWorldTicketEvent;
@@ -9,6 +11,7 @@ import io.github.steveplays28.noisiumchunkmanager.server.event.world.ServerTickE
 import io.github.steveplays28.noisiumchunkmanager.util.networking.packet.PacketUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -25,9 +28,11 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
 
 import net.minecraft.server.level.ChunkMap;
+import net.minecraft.server.level.DistanceManager;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.ThreadedLevelLightEngine;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.server.level.progress.ChunkProgressListener;
 import net.minecraft.world.entity.Entity;
@@ -52,13 +57,17 @@ import net.minecraft.world.level.storage.LevelStorageSource;
  */
 @Mixin(ServerChunkCache.class)
 public abstract class ServerChunkManagerMixin {
-	@Shadow
-	public abstract Level getLevel();
-
 	@Mutable
 	@Shadow
 	@Final
 	public @Nullable ChunkMap chunkMap;
+
+	@Shadow
+	@Final
+	@NotNull ServerLevel level;
+
+	@Shadow
+	public abstract Level getLevel();
 
 	@Shadow
 	public abstract @NotNull ChunkGenerator getGenerator();
@@ -66,28 +75,44 @@ public abstract class ServerChunkManagerMixin {
 	@Shadow
 	public abstract @NotNull RandomState randomState();
 
-	@Shadow
-	@Final
-	@NotNull ServerLevel level;
-
 	@Unique
 	private ChunkGenerator noisiumchunkmanager$chunkGenerator;
 	@Unique
 	private ChunkGeneratorStructureState noisiumchunkmanager$structurePlacementCalculator;
 
-	@Inject(method = "<init>", at = @At(value = "TAIL"))
-	private void noisiumchunkmanager$constructorInject(ServerLevel world, LevelStorageSource.LevelStorageAccess session, DataFixer dataFixer, StructureTemplateManager structureTemplateManager, Executor workerExecutor, @NotNull ChunkGenerator chunkGenerator, int viewDistance, int simulationDistance, boolean dsync, ChunkProgressListener worldGenerationProgressListener, ChunkStatusUpdateListener chunkStatusChangeListener, Supplier<DimensionDataStorage> persistentStateManagerFactory, CallbackInfo ci) {
-		noisiumchunkmanager$chunkGenerator = chunkGenerator;
-		noisiumchunkmanager$structurePlacementCalculator = this.getGenerator().createState(
-				this.getLevel().registryAccess().lookupOrThrow(Registries.STRUCTURE_SET), this.randomState(),
-				((ServerLevel) this.getLevel()).getSeed()
-		);
-		chunkMap = null;
+	@WrapOperation(method = "<init>", at = @At(value = "FIELD", opcode = Opcodes.PUTFIELD, target = "Lnet/minecraft/server/level/ServerChunkCache;chunkMap:Lnet/minecraft/server/level/ChunkMap;"))
+	private void noisiumchunkmanager$preventCreatingChunkMap(ServerChunkCache instance, ChunkMap newValue, Operation<Void> original, ServerLevel serverLevel, LevelStorageSource.LevelStorageAccess levelStorageAccess, DataFixer dataFixer, StructureTemplateManager structureTemplateManager, Executor executor, ChunkGenerator chunkGenerator, int i, int j, boolean bl, ChunkProgressListener chunkProgressListener, ChunkStatusUpdateListener chunkStatusUpdateListener, Supplier<DimensionDataStorage> supplier) {
+		return;
 	}
 
-	@Inject(method = "pollTask", at = @At(value = "HEAD"), cancellable = true)
-	private void noisiumchunkmanager$stopServerChunkManagerFromRunningTasks(@NotNull CallbackInfoReturnable<Boolean> cir) {
-		cir.setReturnValue(true);
+	@WrapOperation(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;getLightEngine()Lnet/minecraft/server/level/ThreadedLevelLightEngine;"))
+	private ThreadedLevelLightEngine noisiumchunkmanager$preventGettingLightEngineFromChunkMap(ChunkMap instance, Operation<ThreadedLevelLightEngine> original) {
+		return null;
+	}
+
+	@WrapOperation(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;getDistanceManager()Lnet/minecraft/server/level/DistanceManager;"))
+	private DistanceManager noisiumchunkmanager$preventGettingDistanceManagerFromChunkMap(ChunkMap instance, Operation<DistanceManager> original) {
+		return null;
+	}
+
+	@WrapOperation(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/DistanceManager;updateSimulationDistance(I)V"))
+	private void noisiumchunkmanager$preventUpdatingSimulationDistanceInDistanceManager(DistanceManager instance, int simulationDistance, Operation<Void> original) {
+		return;
+	}
+
+	@Inject(method = "<init>", at = @At(value = "TAIL"))
+	private void noisiumchunkmanager$constructorInject(ServerLevel world, LevelStorageSource.LevelStorageAccess session, DataFixer dataFixer, StructureTemplateManager structureTemplateManager, Executor workerExecutor, @NotNull ChunkGenerator chunkGenerator, int viewDistance, int simulationDistance, boolean dsync, ChunkProgressListener worldGenerationProgressListener, ChunkStatusUpdateListener chunkStatusChangeListener, Supplier<DimensionDataStorage> persistentStateManagerFactory, CallbackInfo ci) {
+		var level = this.getLevel();
+		noisiumchunkmanager$chunkGenerator = chunkGenerator;
+		noisiumchunkmanager$structurePlacementCalculator = this.getGenerator().createState(
+				level.registryAccess().lookupOrThrow(Registries.STRUCTURE_SET), this.randomState(),
+				((ServerLevel) level).getSeed()
+		);
+	}
+	
+	@Inject(method = "close", at = @At(value = "HEAD"), cancellable = true)
+	private void noisiumchunkmanager$cancelClose(@NotNull CallbackInfo ci) {
+		ci.cancel();
 	}
 
 	@Inject(method = "tick(Ljava/util/function/BooleanSupplier;Z)V", at = @At(value = "HEAD"), cancellable = true)
@@ -96,14 +121,10 @@ public abstract class ServerChunkManagerMixin {
 		ci.cancel();
 	}
 
-	@Inject(method = "close", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ChunkMap;close()V", shift = At.Shift.BEFORE), cancellable = true)
-	private void noisiumchunkmanager$cancelRemoveThreadedAnvilChunkStorageClose(@NotNull CallbackInfo ci) {
-		ci.cancel();
-	}
-
 	// TODO: Fix infinite loop
 	@Inject(method = "getChunk(IILnet/minecraft/world/level/chunk/ChunkStatus;Z)Lnet/minecraft/world/level/chunk/ChunkAccess;", at = @At(value = "HEAD"), cancellable = true)
 	private void noisiumchunkmanager$getChunkFromNoisiumServerWorldChunkManager(int chunkX, int chunkZ, ChunkStatus leastStatus, boolean create, CallbackInfoReturnable<ChunkAccess> cir) {
+		// NoisiumChunkManager.LOGGER.info("Getting chunk at ({}, {}).", chunkX, chunkZ);
 		var noisiumServerWorldChunkManager = ((ServerWorldExtension) this.getLevel()).noisiumchunkmanager$getServerWorldChunkManager();
 		var chunkPosition = new ChunkPos(chunkX, chunkZ);
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
@@ -115,19 +136,30 @@ public abstract class ServerChunkManagerMixin {
 	}
 
 	@Inject(method = "getChunkForLighting(II)Lnet/minecraft/world/level/chunk/LightChunk;", at = @At(value = "HEAD"), cancellable = true)
-	private void noisiumchunkmanager$getChunkFromNoisiumServerWorldChunkManager(int chunkX, int chunkZ, CallbackInfoReturnable<LevelChunk> cir) {
+	private void noisiumchunkmanager$getChunkFromNoisiumServerWorldChunkManager(int chunkX, int chunkZ, @NotNull CallbackInfoReturnable<@Nullable LevelChunk> cir) {	
 		var noisiumServerWorldChunkManager = ((ServerWorldExtension) this.getLevel()).noisiumchunkmanager$getServerWorldChunkManager();
 		var chunkPosition = new ChunkPos(chunkX, chunkZ);
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
-			cir.setReturnValue(noisiumServerWorldChunkManager.getIoWorldChunk(chunkPosition));
+			// NoisiumChunkManager.LOGGER.info("Getting chunk for lighting at ({}, {}), returning `null`.", chunkX, chunkZ);
+			// NoisiumChunkManager.LOGGER.info("", new Throwable());
+			cir.setReturnValue(null);
 			return;
 		}
-
-		cir.setReturnValue(noisiumServerWorldChunkManager.getChunk(chunkPosition));
+		
+		// NoisiumChunkManager.LOGGER.info("Getting chunk for lighting at ({}, {}), returning loaded chunk.", chunkX, chunkZ);
+		// NoisiumChunkManager.LOGGER.info("", new Throwable());
+		@NotNull var worldChunk = noisiumServerWorldChunkManager.getChunk(chunkPosition);
+		// if (worldChunk.isLightCorrect()) {
+		// 	cir.setReturnValue(null);
+		// 	return;
+		// }
+		
+		cir.setReturnValue(null);
 	}
 
 	@Inject(method = "getChunkNow", at = @At(value = "HEAD"), cancellable = true)
 	private void noisiumchunkmanager$getWorldChunkFromNoisiumServerWorldChunkManager(int chunkX, int chunkZ, CallbackInfoReturnable<LevelChunk> cir) {
+		// NoisiumChunkManager.LOGGER.info("Getting chunk now at ({}, {}).", chunkX, chunkZ);
 		var noisiumServerWorldChunkManager = ((ServerWorldExtension) this.getLevel()).noisiumchunkmanager$getServerWorldChunkManager();
 		var chunkPosition = new ChunkPos(chunkX, chunkZ);
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
@@ -254,5 +286,13 @@ public abstract class ServerChunkManagerMixin {
 	private void noisiumchunkmanager$invokeTicketRemovedEvent(@NotNull TicketType<?> ticketType, @NotNull ChunkPos chunkPosition, int radius, Object argument, @NotNull CallbackInfo ci) {
 		ServerWorldTicketEvent.TICKET_REMOVED.invoker().onTicketRemoved(this.level, chunkPosition);
 		ci.cancel();
+	}
+
+	@Mixin(targets = "net.minecraft.server.level.ServerChunkCache$MainThreadExecutor")
+	public static abstract class MainThreadExecutorMixin {
+		@Inject(method = "pollTask", at = @At(value = "HEAD"), cancellable = true)
+		private void noisiumchunkmanager$stopServerChunkManagerMainThreadExecutorFromRunningTasks(@NotNull CallbackInfoReturnable<Boolean> cir) {
+			cir.setReturnValue(true);
+		}
 	}
 }
