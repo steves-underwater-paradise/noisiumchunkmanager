@@ -1,0 +1,23 @@
+{
+  "languages": {
+    "Java": {
+      "language_servers": ["jdtls"],
+      "formatter": "language_server"
+    }
+  },
+  "lsp": {
+    "jdtls": {
+      "initialization_options": {
+        "settings": {
+          "java": {
+            "format": {
+              "settings": {
+                "url": "/home/steveplays/Documents/Important/Config files/VSCode/java_redhat_extension_formatting.xml"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

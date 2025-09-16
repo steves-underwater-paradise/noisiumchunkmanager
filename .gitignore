@@ -121,7 +121,6 @@ run/
 # Avoid ignoring libraries
 !libraries/**
 
-.zed/
 .project
 .factorypath
 .settings/
