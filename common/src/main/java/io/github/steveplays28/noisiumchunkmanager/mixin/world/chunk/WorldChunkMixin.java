@@ -20,14 +20,10 @@ import net.minecraft.world.level.lighting.LevelLightEngine;
 
 @Mixin(LevelChunk.class)
 public class WorldChunkMixin implements WorldChunkExtension {
-	@Shadow
-	@Final
-	Level level;
+	@Shadow @Final Level level;
 
-	@Unique
-	private final BitSet noisiumchunkmanager$blockLightBits = new BitSet();
-	@Unique
-	private final BitSet noisiumchunkmanager$skyLightBits = new BitSet();
+	@Unique private final BitSet noisiumchunkmanager$blockLightBits = new BitSet();
+	@Unique private final BitSet noisiumchunkmanager$skyLightBits = new BitSet();
 
 	@Override
 	public @NotNull BitSet noisiumchunkmanager$getBlockLightBits() {

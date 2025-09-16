@@ -52,19 +52,14 @@ import net.minecraft.world.level.storage.DimensionDataStorage;
 import net.minecraft.world.level.storage.LevelStorageSource;
 
 /**
- * {@link Mixin} into {@link ServerChunkCache}.
- * This {@link Mixin} redirects all method calls from the {@link ServerLevel}'s {@link ServerChunkCache} to the {@link ServerLevel}'s {@link ServerWorldChunkManager}.
+ * {@link Mixin} into {@link ServerChunkCache}. This {@link Mixin} redirects all method calls from the {@link ServerLevel}'s {@link ServerChunkCache} to the {@link ServerLevel}'s
+ * {@link ServerWorldChunkManager}.
  */
 @Mixin(ServerChunkCache.class)
 public abstract class ServerChunkManagerMixin {
-	@Mutable
-	@Shadow
-	@Final
-	public @Nullable ChunkMap chunkMap;
+	@Mutable @Shadow @Final public @Nullable ChunkMap chunkMap;
 
-	@Shadow
-	@Final
-	@NotNull ServerLevel level;
+	@Shadow @Final @NotNull ServerLevel level;
 
 	@Shadow
 	public abstract Level getLevel();
@@ -75,13 +70,13 @@ public abstract class ServerChunkManagerMixin {
 	@Shadow
 	public abstract @NotNull RandomState randomState();
 
-	@Unique
-	private ChunkGenerator noisiumchunkmanager$chunkGenerator;
-	@Unique
-	private ChunkGeneratorStructureState noisiumchunkmanager$structurePlacementCalculator;
+	@Unique private ChunkGenerator noisiumchunkmanager$chunkGenerator;
+	@Unique private ChunkGeneratorStructureState noisiumchunkmanager$structurePlacementCalculator;
 
 	@WrapOperation(method = "<init>", at = @At(value = "FIELD", opcode = Opcodes.PUTFIELD, target = "Lnet/minecraft/server/level/ServerChunkCache;chunkMap:Lnet/minecraft/server/level/ChunkMap;"))
-	private void noisiumchunkmanager$preventCreatingChunkMap(ServerChunkCache instance, ChunkMap newValue, Operation<Void> original, ServerLevel serverLevel, LevelStorageSource.LevelStorageAccess levelStorageAccess, DataFixer dataFixer, StructureTemplateManager structureTemplateManager, Executor executor, ChunkGenerator chunkGenerator, int i, int j, boolean bl, ChunkProgressListener chunkProgressListener, ChunkStatusUpdateListener chunkStatusUpdateListener, Supplier<DimensionDataStorage> supplier) {
+	private void noisiumchunkmanager$preventCreatingChunkMap(ServerChunkCache instance, ChunkMap newValue, Operation<Void> original, ServerLevel serverLevel,
+			LevelStorageSource.LevelStorageAccess levelStorageAccess, DataFixer dataFixer, StructureTemplateManager structureTemplateManager, Executor executor, ChunkGenerator chunkGenerator, int i,
+			int j, boolean bl, ChunkProgressListener chunkProgressListener, ChunkStatusUpdateListener chunkStatusUpdateListener, Supplier<DimensionDataStorage> supplier) {
 		return;
 	}
 
@@ -101,15 +96,15 @@ public abstract class ServerChunkManagerMixin {
 	}
 
 	@Inject(method = "<init>", at = @At(value = "TAIL"))
-	private void noisiumchunkmanager$constructorInject(ServerLevel world, LevelStorageSource.LevelStorageAccess session, DataFixer dataFixer, StructureTemplateManager structureTemplateManager, Executor workerExecutor, @NotNull ChunkGenerator chunkGenerator, int viewDistance, int simulationDistance, boolean dsync, ChunkProgressListener worldGenerationProgressListener, ChunkStatusUpdateListener chunkStatusChangeListener, Supplier<DimensionDataStorage> persistentStateManagerFactory, CallbackInfo ci) {
+	private void noisiumchunkmanager$constructorInject(ServerLevel world, LevelStorageSource.LevelStorageAccess session, DataFixer dataFixer, StructureTemplateManager structureTemplateManager,
+			Executor workerExecutor, @NotNull ChunkGenerator chunkGenerator, int viewDistance, int simulationDistance, boolean dsync, ChunkProgressListener worldGenerationProgressListener,
+			ChunkStatusUpdateListener chunkStatusChangeListener, Supplier<DimensionDataStorage> persistentStateManagerFactory, CallbackInfo ci) {
 		var level = this.getLevel();
 		noisiumchunkmanager$chunkGenerator = chunkGenerator;
-		noisiumchunkmanager$structurePlacementCalculator = this.getGenerator().createState(
-				level.registryAccess().lookupOrThrow(Registries.STRUCTURE_SET), this.randomState(),
-				((ServerLevel) level).getSeed()
-		);
+		noisiumchunkmanager$structurePlacementCalculator =
+				this.getGenerator().createState(level.registryAccess().lookupOrThrow(Registries.STRUCTURE_SET), this.randomState(), ((ServerLevel) level).getSeed());
 	}
-	
+
 	@Inject(method = "close", at = @At(value = "HEAD"), cancellable = true)
 	private void noisiumchunkmanager$cancelClose(@NotNull CallbackInfo ci) {
 		ci.cancel();
@@ -136,7 +131,7 @@ public abstract class ServerChunkManagerMixin {
 	}
 
 	@Inject(method = "getChunkForLighting(II)Lnet/minecraft/world/level/chunk/LightChunk;", at = @At(value = "HEAD"), cancellable = true)
-	private void noisiumchunkmanager$getChunkFromNoisiumServerWorldChunkManager(int chunkX, int chunkZ, @NotNull CallbackInfoReturnable<@Nullable LevelChunk> cir) {	
+	private void noisiumchunkmanager$getChunkFromNoisiumServerWorldChunkManager(int chunkX, int chunkZ, @NotNull CallbackInfoReturnable<@Nullable LevelChunk> cir) {
 		var noisiumServerWorldChunkManager = ((ServerWorldExtension) this.getLevel()).noisiumchunkmanager$getServerWorldChunkManager();
 		var chunkPosition = new ChunkPos(chunkX, chunkZ);
 		if (!noisiumServerWorldChunkManager.isChunkLoaded(chunkPosition)) {
@@ -145,16 +140,10 @@ public abstract class ServerChunkManagerMixin {
 			cir.setReturnValue(null);
 			return;
 		}
-		
+
 		// NoisiumChunkManager.LOGGER.info("Getting chunk for lighting at ({}, {}), returning loaded chunk.", chunkX, chunkZ);
 		// NoisiumChunkManager.LOGGER.info("", new Throwable());
-		@NotNull var worldChunk = noisiumServerWorldChunkManager.getChunk(chunkPosition);
-		// if (worldChunk.isLightCorrect()) {
-		// 	cir.setReturnValue(null);
-		// 	return;
-		// }
-		
-		cir.setReturnValue(null);
+		cir.setReturnValue(noisiumServerWorldChunkManager.getChunk(chunkPosition));
 	}
 
 	@Inject(method = "getChunkNow", at = @At(value = "HEAD"), cancellable = true)
@@ -241,8 +230,7 @@ public abstract class ServerChunkManagerMixin {
 
 	@Inject(method = "hasChunk", at = @At(value = "HEAD"), cancellable = true)
 	private void noisiumchunkmanager$isChunkLoadedInNoisiumServerWorldChunkManager(int chunkX, int chunkZ, CallbackInfoReturnable<Boolean> cir) {
-		cir.setReturnValue(((ServerWorldExtension) this.getLevel()).noisiumchunkmanager$getServerWorldChunkManager().isChunkLoaded(
-				new ChunkPos(chunkX, chunkZ)));
+		cir.setReturnValue(((ServerWorldExtension) this.getLevel()).noisiumchunkmanager$getServerWorldChunkManager().isChunkLoaded(new ChunkPos(chunkX, chunkZ)));
 	}
 
 	@Inject(method = "getGeneratorState", at = @At(value = "HEAD"), cancellable = true)
