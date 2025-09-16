@@ -12,7 +12,7 @@
           "java": {
             "format": {
               "settings": {
-                "url": "/home/steveplays/Documents/Important/Config files/VSCode/java_redhat_extension_formatting.xml"
+                "url": ".zed/java_redhat_extension_formatting.xml"
               }
             }
           }
