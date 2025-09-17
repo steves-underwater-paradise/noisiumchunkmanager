@@ -101,11 +101,7 @@ public class ServerWorldChunkManager {
 				return;
 			}
 
-			syncRunnableConsumer.accept(() -> {
-				if (serverWorld.getLightEngine().hasLightWork()) {
-					serverWorld.getLightEngine().runLightUpdates();
-				}
-			});
+			serverWorld.getLightEngine().runLightUpdates();
 			pointOfInterestStorage.tick(() -> true);
 			NoisiumChunkManager.LOGGER.info("Loading {} chunks.", loadingWorldChunks.size());
 		});
@@ -156,10 +152,8 @@ public class ServerWorldChunkManager {
 				return;
 			}
 
-			fetchedWorldChunk.initializeLightSources();
 
 			syncRunnableConsumer.accept(() -> {
-				lightLevelChunk(fetchedWorldChunk);
 				// fetchedWorldChunk.postProcessGeneration();
 				fetchedWorldChunk.registerTickContainerInLevel(serverWorld);
 				// serverWorld.startTickingChunk(fetchedWorldChunk);
@@ -209,9 +203,9 @@ public class ServerWorldChunkManager {
 				loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
 			}
 
-			fetchedWorldChunk.initializeLightSources();
+			// fetchedWorldChunk.initializeLightSources();
+			// lightProtoChunk(fetchedWorldChunk);
 			syncRunnableConsumer.accept(() -> {
-				// lightLevelChunk(fetchedWorldChunk);
 				// fetchedWorldChunk.postProcessGeneration();
 				fetchedWorldChunk.registerTickContainerInLevel(serverWorld);
 				// serverWorld.startTickingChunk(fetchedWorldChunk);
@@ -227,9 +221,9 @@ public class ServerWorldChunkManager {
 		var fetchedChunk = ChunkSerializer.read(serverWorld, pointOfInterestStorage, chunkPos, fetchedNbtData);
 		var fetchedWorldChunk =
 				new LevelChunk(serverWorld, fetchedChunk, chunkToAddEntitiesTo -> serverWorld.addWorldGenChunkEntities(EntityType.loadEntitiesRecursive(fetchedChunk.getEntities(), serverWorld)));
-		fetchedWorldChunk.initializeLightSources();
+		// fetchedWorldChunk.initializeLightSources();
+		// lightLevelChunk(fetchedWorldChunk);
 		syncRunnableConsumer.accept(() -> {
-			lightLevelChunk(fetchedWorldChunk);
 			// fetchedWorldChunk.postProcessGeneration();
 			fetchedWorldChunk.registerTickContainerInLevel(serverWorld);
 			// serverWorld.startTickingChunk(fetchedWorldChunk);
@@ -246,19 +240,19 @@ public class ServerWorldChunkManager {
 		return fetchedWorldChunk;
 	}
 
-	private void lightLevelChunk(@NotNull LevelChunk levelChunk) {
-		@NotNull var levelChunkPosition = levelChunk.getPos();
+	private void lightProtoChunk(@NotNull ProtoChunk protoChunk) {
+		@NotNull var protoChunkPosition = protoChunk.getPos();
 		@NotNull var levelLightEngine = serverWorld.getLightEngine();
-		for (int i = 0; i < levelChunk.getSectionsCount(); i++) {
-			levelLightEngine.updateSectionStatus(SectionPos.of(levelChunkPosition, levelChunk.getSectionYFromSectionIndex(i)), false);
+		for (int i = 0; i < protoChunk.getSectionsCount(); i++) {
+			levelLightEngine.updateSectionStatus(SectionPos.of(protoChunkPosition, protoChunk.getSectionYFromSectionIndex(i)), false);
 		}
-		levelLightEngine.setLightEnabled(levelChunkPosition, levelChunk.isLightCorrect());
-		levelLightEngine.retainData(levelChunkPosition, false);
-		levelChunk.setLightCorrect(false);
-		if (!levelChunk.isLightCorrect()) {
-			levelLightEngine.propagateLightSources(levelChunkPosition);
+		levelLightEngine.setLightEnabled(protoChunkPosition, protoChunk.isLightCorrect());
+		levelLightEngine.retainData(protoChunkPosition, false);
+		protoChunk.setLightCorrect(false);
+		if (!protoChunk.isLightCorrect()) {
+			levelLightEngine.propagateLightSources(protoChunkPosition);
 		}
-		levelChunk.setLightCorrect(true);
+		protoChunk.setLightCorrect(true);
 	}
 
 	public @NotNull IoWorldChunk getIoWorldChunk(@NotNull ChunkPos chunkPos) {
@@ -466,10 +460,12 @@ public class ServerWorldChunkManager {
 
 		protoChunk.setStatus(ChunkStatus.INITIALIZE_LIGHT);
 		// protoChunk.initializeLightSources();
+		protoChunk.initializeLightSources();
 		// serverLightingProvider.initializeLight(protoChunk, protoChunk.isLightCorrect());
 
 		protoChunk.setStatus(ChunkStatus.LIGHT);
 		// serverLightingProvider.lightChunk(protoChunk, protoChunk.isLightCorrect());
+		lightProtoChunk(protoChunk);
 
 		protoChunk.setStatus(ChunkStatus.SPAWN);
 		// chunkGenerator.spawnOriginalMobs(chunkRegion);

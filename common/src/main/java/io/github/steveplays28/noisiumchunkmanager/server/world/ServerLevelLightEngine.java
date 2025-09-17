@@ -13,7 +13,6 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LightChunkGetter;
-import net.minecraft.world.level.lighting.LayerLightEventListener;
 import net.minecraft.world.level.lighting.LayerLightSectionStorage;
 import net.minecraft.world.level.lighting.LevelLightEngine;
 
@@ -51,14 +50,25 @@ public class ServerLevelLightEngine extends LevelLightEngine {
 
 	@Override
 	public int runLightUpdates() {
-		int i = 0;
 		if (this.blockEngine != null) {
-			i += CompletableFuture.supplyAsync(() -> this.blockEngine.runLightUpdates(), blockLightEngineThreadPoolExecutor).join();
+			CompletableFuture.runAsync(() -> {
+				if (!this.blockEngine.hasLightWork()) {
+					return;
+				}
+
+				this.blockEngine.runLightUpdates();
+			}, blockLightEngineThreadPoolExecutor);
 		}
 		if (this.skyEngine != null) {
-			i += CompletableFuture.supplyAsync(() -> this.skyEngine.runLightUpdates(), skyLightEngineThreadPoolExecutor).join();
+			CompletableFuture.runAsync(() -> {
+				if (!this.skyEngine.hasLightWork()) {
+					return;
+				}
+
+				this.skyEngine.runLightUpdates();
+			}, skyLightEngineThreadPoolExecutor);
 		}
-		return i;
+		return 0;
 	}
 
 	@Override
