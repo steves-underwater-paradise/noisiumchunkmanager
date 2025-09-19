@@ -25,32 +25,29 @@ import net.minecraft.world.level.lighting.LevelLightEngine;
 
 public class ChunkUtil {
 	/**
-	 * Sends a {@link LevelChunk} to all players in the specified world.
-	 * WARNING: This method blocks the server thread. Prefer using {@link ChunkUtil#sendWorldChunkToPlayerAsync(ServerLevel, CompletableFuture, Executor)} instead.
+	 * Sends a {@link LevelChunk} to all players in the specified world. WARNING: This method blocks the server thread. Prefer using
+	 * {@link ChunkUtil#sendWorldChunkToPlayerAsync(ServerLevel, CompletableFuture, Executor)} instead.
 	 *
 	 * @param serverLevel The world the {@link LevelChunk} resides in.
-	 * @param worldChunk  The {@link LevelChunk}.
+	 * @param worldChunk The {@link LevelChunk}.
 	 */
 	public static void sendWorldChunkToPlayer(@NotNull ServerLevel serverLevel, @NotNull LevelChunk worldChunk) {
 		try {
 			var worldChunkExtension = (WorldChunkExtension) worldChunk;
-			var chunkDataS2CPacket = new ClientboundLevelChunkWithLightPacket(worldChunk, serverLevel.getLightEngine(), worldChunkExtension.noisiumchunkmanager$getSkyLightBits(), worldChunkExtension.noisiumchunkmanager$getBlockLightBits());
+			var chunkDataS2CPacket = new ClientboundLevelChunkWithLightPacket(worldChunk, serverLevel.getLightEngine(), worldChunkExtension.noisiumchunkmanager$getSkyLightBits(),
+					worldChunkExtension.noisiumchunkmanager$getBlockLightBits());
 			for (int i = 0; i < serverLevel.players().size(); i++) {
 				serverLevel.players().get(i).trackChunk(worldChunk.getPos(), chunkDataS2CPacket);
 			}
 		} catch (ReportedException e) {
-			NoisiumChunkManager.LOGGER.error(
-					"Exception thrown while trying to send a chunk packet to all players in a server world:\n{}",
-					ExceptionUtils.getStackTrace(e)
-			);
+			NoisiumChunkManager.LOGGER.error("Exception thrown while trying to send a chunk packet to all players in a server world:\n{}", ExceptionUtils.getStackTrace(e));
 		}
 	}
 
 	/**
-	 * Sends a {@link LevelChunk} to all players in the specified world.
-	 * This method is ran asynchronously.
+	 * Sends a {@link LevelChunk} to all players in the specified world. This method is ran asynchronously.
 	 *
-	 * @param serverWorld      The world the {@link LevelChunk} resides in.
+	 * @param serverWorld The world the {@link LevelChunk} resides in.
 	 * @param worldChunkFuture The {@link CompletableFuture<WorldChunk>}.
 	 */
 	public static void sendWorldChunkToPlayerAsync(@NotNull ServerLevel serverWorld, @NotNull CompletableFuture<LevelChunk> worldChunkFuture, @NotNull Executor executor) {
@@ -58,8 +55,8 @@ public class ChunkUtil {
 	}
 
 	/**
-	 * Sends a {@link List} of {@link LevelChunk}s to all players in the specified world.
-	 * WARNING: This method blocks the server thread. Prefer using {@link ChunkUtil#sendWorldChunksToPlayerAsync(ServerLevel, List, Executor)} instead.
+	 * Sends a {@link List} of {@link LevelChunk}s to all players in the specified world. WARNING: This method blocks the server thread. Prefer using
+	 * {@link ChunkUtil#sendWorldChunksToPlayerAsync(ServerLevel, List, Executor)} instead.
 	 *
 	 * @param serverWorld The world the {@link LevelChunk} resides in.
 	 * @param worldChunks The {@link List} of {@link LevelChunk}s.
@@ -73,32 +70,31 @@ public class ChunkUtil {
 	}
 
 	/**
-	 * Sends a {@link List} of {@link CompletableFuture<WorldChunk>}s to all players in the specified world.
-	 * This method is ran asynchronously.
+	 * Sends a {@link List} of {@link CompletableFuture<WorldChunk>}s to all players in the specified world. This method is ran asynchronously.
 	 *
-	 * @param serverWorld       The world the {@link LevelChunk} resides in.
+	 * @param serverWorld The world the {@link LevelChunk} resides in.
 	 * @param worldChunkFutures The {@link List} of {@link CompletableFuture<WorldChunk>}s
 	 */
 	@SuppressWarnings("ForLoopReplaceableByForEach")
 	public static void sendWorldChunksToPlayerAsync(@NotNull ServerLevel serverWorld, @NotNull List<CompletableFuture<LevelChunk>> worldChunkFutures, @NotNull Executor executor) {
 		// TODO: Send a whole batch of chunks to the player at once to save on network traffic
 		for (int i = 0; i < worldChunkFutures.size(); i++) {
-			worldChunkFutures.get(i).whenCompleteAsync(
-					(worldChunk, throwable) -> sendWorldChunkToPlayer(serverWorld, worldChunk), executor);
+			worldChunkFutures.get(i).whenCompleteAsync((worldChunk, throwable) -> sendWorldChunkToPlayer(serverWorld, worldChunk), executor);
 		}
 	}
 
 	/**
 	 * Sends a light update to a {@link List} of players.
 	 *
-	 * @param players          The {@link List} of players.
+	 * @param players The {@link List} of players.
 	 * @param lightingProvider The {@link LevelLightEngine} of the world.
-	 * @param chunkPos         The {@link ChunkPos} at which the light update happened.
-	 * @param skyLightBits     The skylight {@link BitSet}.
-	 * @param blockLightBits   The blocklight {@link BitSet}.
+	 * @param chunkPos The {@link ChunkPos} at which the light update happened.
+	 * @param skyLightBits The skylight {@link BitSet}.
+	 * @param blockLightBits The blocklight {@link BitSet}.
 	 */
 	@SuppressWarnings("ForLoopReplaceableByForEach")
-	public static void sendLightUpdateToPlayers(@NotNull List<ServerPlayer> players, @NotNull LevelLightEngine lightingProvider, @NotNull ChunkPos chunkPos, @NotNull BitSet skyLightBits, @NotNull BitSet blockLightBits) {
+	public static void sendLightUpdateToPlayers(@NotNull List<ServerPlayer> players, @NotNull LevelLightEngine lightingProvider, @NotNull ChunkPos chunkPos, @NotNull BitSet skyLightBits,
+			@NotNull BitSet blockLightBits) {
 		for (int i = 0; i < players.size(); i++) {
 			players.get(i).connection.send(new ClientboundLightUpdatePacket(chunkPos, lightingProvider, skyLightBits, blockLightBits));
 		}
@@ -107,8 +103,8 @@ public class ChunkUtil {
 	/**
 	 * Sends a block update to a {@link List} of players.
 	 *
-	 * @param players    The {@link List} of players.
-	 * @param blockPos   The {@link BlockPos} of the block update that should be sent to the {@link List} of players.
+	 * @param players The {@link List} of players.
+	 * @param blockPos The {@link BlockPos} of the block update that should be sent to the {@link List} of players.
 	 * @param blockState The {@link BlockState} at the specified {@link BlockPos} of the block update that should be sent to the {@link List} of players.
 	 */
 	@SuppressWarnings("ForLoopReplaceableByForEach")
@@ -130,7 +126,7 @@ public class ChunkUtil {
 	}
 
 	/**
-	 * @param chunkPositions      A {@link List} of {@link ChunkPos}s.
+	 * @param chunkPositions A {@link List} of {@link ChunkPos}s.
 	 * @param otherChunkPositions Another {@link List} of {@link ChunkPos}s.
 	 * @return The {@link ChunkPos}s that are in {@code chunkPositions}, but not in {@code otherChunkPositions}.
 	 */

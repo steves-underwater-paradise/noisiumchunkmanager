@@ -8,7 +8,6 @@ import dev.architectury.event.events.common.LifecycleEvent;
 import dev.architectury.event.events.common.TickEvent;
 import io.github.steveplays28.noisiumchunkmanager.NoisiumChunkManager;
 import io.github.steveplays28.noisiumchunkmanager.config.NoisiumChunkManagerConfig;
-import io.github.steveplays28.noisiumchunkmanager.extension.world.chunk.WorldChunkExtension;
 import io.github.steveplays28.noisiumchunkmanager.extension.world.level.chunk.storage.SectionStorageExtension;
 import io.github.steveplays28.noisiumchunkmanager.mixin.accessor.util.collection.PackedIntegerArrayAccessor;
 import io.github.steveplays28.noisiumchunkmanager.mixin.accessor.world.gen.chunk.NoiseChunkGeneratorAccessor;
@@ -101,18 +100,30 @@ public class ServerWorldChunkManager {
 				return;
 			}
 
+			unloadingWorldChunks.removeIf((@NotNull ChunkPos chunkPosition) -> {
+				var removeUnloadingWorldChunkCondition = !loadingWorldChunks.containsKey(chunkPosition);
+				if (removeUnloadingWorldChunkCondition) {
+					loadedWorldChunks.remove(chunkPosition);
+				}
+
+				return removeUnloadingWorldChunkCondition;
+			});
 			serverWorld.getLightEngine().runLightUpdates();
 			pointOfInterestStorage.tick(() -> true);
-			NoisiumChunkManager.LOGGER.info("Loading {} chunks.", loadingWorldChunks.size());
+			NoisiumChunkManager.LOGGER.info("Loading {} chunks, unloading {} chunks and loaded {} chunks.", loadingWorldChunks.size(), unloadingWorldChunks.size(), loadedWorldChunks.size());
 		});
 		LifecycleEvent.SERVER_STOPPING.register(instance -> {
 			this.isStopping = true;
-			// ((LevelLightEngine) serverWorld.getLightEngine()).close();
 			for (var loadingWorldChunkCompletableFuture : loadingWorldChunks.values()) {
 				loadingWorldChunkCompletableFuture.cancel(true);
 			}
-
 			loadingWorldChunks.clear();
+			for (var loadedWorldChunk : loadedWorldChunks.values()) {
+				@NotNull var chunkPosition = loadedWorldChunk.getPos();
+				pointOfInterestStorage.flush(chunkPosition);
+				loadedWorldChunk.setUnsaved(false);
+				versionedChunkStorage.write(chunkPosition, ChunkSerializer.write(serverWorld, loadedWorldChunk));
+			}
 			loadedWorldChunks.clear();
 		});
 	}
@@ -158,17 +169,16 @@ public class ServerWorldChunkManager {
 				fetchedWorldChunk.registerTickContainerInLevel(serverWorld);
 				// serverWorld.startTickingChunk(fetchedWorldChunk);
 			});
-			loadingWorldChunks.remove(chunkPos);
 
+			loadingWorldChunks.remove(chunkPos);
 			if (!unloadingWorldChunks.contains(chunkPos)) {
 				loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
 			}
-
 			// TODO: Run `serverLevel.getProfiler().incrementCounter("chunkLoad");` on the ServerChunkEvent.WORLD_CHUNK_LOADED event
-			// syncRunnableConsumer.accept(
-			// () -> ServerChunkEvent.WORLD_CHUNK_LOADED.invoker().onWorldChunkLoaded(serverWorld, fetchedWorldChunk));
-			// unloadingWorldChunks.remove(chunkPos);
-			// syncRunnableConsumer.accept(() -> ServerChunkEvent.WORLD_CHUNK_UNLOADED.invoker().onWorldChunkUnloaded(serverWorld, chunkPos));
+			syncRunnableConsumer.accept(() -> ServerChunkEvent.WORLD_CHUNK_LOADED.invoker().onWorldChunkLoaded(serverWorld, fetchedWorldChunk));
+			if (unloadingWorldChunks.remove(chunkPos)) {
+				syncRunnableConsumer.accept(() -> ServerChunkEvent.WORLD_CHUNK_UNLOADED.invoker().onWorldChunkUnloaded(serverWorld, chunkPos));
+			}
 		});
 		loadingWorldChunks.put(chunkPos, worldChunkCompletableFuture);
 		return worldChunkCompletableFuture;
@@ -199,21 +209,19 @@ public class ServerWorldChunkManager {
 		if (fetchedNbtData == null) {
 			// TODO: Schedule ProtoChunk worldgen and update loadedWorldChunks incrementally during worldgen steps
 			var fetchedWorldChunk = new LevelChunk(serverWorld, generateChunk(chunkPos, this::getIoWorldChunk, ioWorldChunks::remove), null);
-			if (!unloadingWorldChunks.contains(chunkPos)) {
-				loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
-			}
-
-			// fetchedWorldChunk.initializeLightSources();
-			// lightProtoChunk(fetchedWorldChunk);
 			syncRunnableConsumer.accept(() -> {
 				// fetchedWorldChunk.postProcessGeneration();
 				fetchedWorldChunk.registerTickContainerInLevel(serverWorld);
 				// serverWorld.startTickingChunk(fetchedWorldChunk);
 			});
 
+			if (!unloadingWorldChunks.contains(chunkPos)) {
+				loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
+			}
 			syncRunnableConsumer.accept(() -> ServerChunkEvent.WORLD_CHUNK_LOADED.invoker().onWorldChunkLoaded(serverWorld, fetchedWorldChunk));
-			unloadingWorldChunks.remove(chunkPos);
-			syncRunnableConsumer.accept(() -> ServerChunkEvent.WORLD_CHUNK_UNLOADED.invoker().onWorldChunkUnloaded(serverWorld, chunkPos));
+			if (unloadingWorldChunks.remove(chunkPos)) {
+				syncRunnableConsumer.accept(() -> ServerChunkEvent.WORLD_CHUNK_UNLOADED.invoker().onWorldChunkUnloaded(serverWorld, chunkPos));
+			}
 			return fetchedWorldChunk;
 		}
 
@@ -221,8 +229,6 @@ public class ServerWorldChunkManager {
 		var fetchedChunk = ChunkSerializer.read(serverWorld, pointOfInterestStorage, chunkPos, fetchedNbtData);
 		var fetchedWorldChunk =
 				new LevelChunk(serverWorld, fetchedChunk, chunkToAddEntitiesTo -> serverWorld.addWorldGenChunkEntities(EntityType.loadEntitiesRecursive(fetchedChunk.getEntities(), serverWorld)));
-		// fetchedWorldChunk.initializeLightSources();
-		// lightLevelChunk(fetchedWorldChunk);
 		syncRunnableConsumer.accept(() -> {
 			// fetchedWorldChunk.postProcessGeneration();
 			fetchedWorldChunk.registerTickContainerInLevel(serverWorld);
@@ -232,11 +238,11 @@ public class ServerWorldChunkManager {
 		if (!unloadingWorldChunks.contains(chunkPos)) {
 			loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
 		}
-
 		// TODO: Run `serverLevel.getProfiler().incrementCounter("chunkLoad");` on the ServerChunkEvent.WORLD_CHUNK_LOADED event
 		syncRunnableConsumer.accept(() -> ServerChunkEvent.WORLD_CHUNK_LOADED.invoker().onWorldChunkLoaded(serverWorld, fetchedWorldChunk));
-		unloadingWorldChunks.remove(chunkPos);
-		syncRunnableConsumer.accept(() -> ServerChunkEvent.WORLD_CHUNK_UNLOADED.invoker().onWorldChunkUnloaded(serverWorld, chunkPos));
+		if (unloadingWorldChunks.remove(chunkPos)) {
+			syncRunnableConsumer.accept(() -> ServerChunkEvent.WORLD_CHUNK_UNLOADED.invoker().onWorldChunkUnloaded(serverWorld, chunkPos));
+		}
 		return fetchedWorldChunk;
 	}
 
@@ -311,6 +317,13 @@ public class ServerWorldChunkManager {
 			return;
 		}
 
+		@Nullable var loadedWorldChunk = loadedWorldChunks.get(chunkPosition);
+		if (loadedWorldChunk == null) {
+			return;
+		}
+
+		saveChunk(loadedWorldChunk);
+		serverWorld.unload(loadedWorldChunk);
 		loadedWorldChunks.remove(chunkPosition);
 		syncRunnableConsumer.accept(() -> ServerChunkEvent.WORLD_CHUNK_UNLOADED.invoker().onWorldChunkUnloaded(serverWorld, chunkPosition));
 	}
@@ -340,6 +353,17 @@ public class ServerWorldChunkManager {
 	 * @param chunkSectionPosition The {@link SectionPos} of the {@link LevelChunk}.
 	 */
 	private void onLightUpdateAsync(@NotNull LightLayer lightType, @NotNull SectionPos chunkSectionPosition) {
+		CompletableFuture.runAsync(() -> this.onLightUpdate(lightType, chunkSectionPosition), threadPoolExecutor);
+	}
+
+	/**
+	 * Updates the chunk's lighting at the specified {@link SectionPos}. WARNING: This method blocks the server thread. Prefer using
+	 * {@link ServerWorldChunkManager#onLightUpdateAsync(LightLayer, SectionPos)} instead.
+	 *
+	 * @param lightType The {@link LightLayer} that should be updated for this {@link LevelChunk}.
+	 * @param chunkSectionPosition The {@link SectionPos} of the {@link LevelChunk}.
+	 */
+	private void onLightUpdate(@NotNull LightLayer lightType, @NotNull SectionPos chunkSectionPosition) {
 		// NoisiumChunkManager.LOGGER.info("light update at {}", chunkSectionPosition);
 		var chunkSectionYPosition = chunkSectionPosition.y();
 		var lightingProvider = serverWorld.getLightEngine();
@@ -371,6 +395,15 @@ public class ServerWorldChunkManager {
 		}
 
 		return null;
+	}
+
+	private void saveChunk(@NotNull ChunkAccess chunkAccess) {
+		@NotNull var chunkPosition = chunkAccess.getPos();
+		syncRunnableConsumer.accept(() -> {
+			pointOfInterestStorage.flush(chunkPosition);
+			chunkAccess.setUnsaved(false);
+			versionedChunkStorage.write(chunkPosition, ChunkSerializer.write(serverWorld, chunkAccess));
+		});
 	}
 
 	// TODO: Move this into the constructor as a Supplier<ChunkPos, ProtoChunk>
@@ -459,21 +492,16 @@ public class ServerWorldChunkManager {
 		ioWorldChunkRemoveFunction.apply(chunkPos);
 
 		protoChunk.setStatus(ChunkStatus.INITIALIZE_LIGHT);
-		// protoChunk.initializeLightSources();
 		protoChunk.initializeLightSources();
-		// serverLightingProvider.initializeLight(protoChunk, protoChunk.isLightCorrect());
 
 		protoChunk.setStatus(ChunkStatus.LIGHT);
-		// serverLightingProvider.lightChunk(protoChunk, protoChunk.isLightCorrect());
 		lightProtoChunk(protoChunk);
 
 		protoChunk.setStatus(ChunkStatus.SPAWN);
 		// chunkGenerator.spawnOriginalMobs(chunkRegion);
 
 		protoChunk.setStatus(ChunkStatus.FULL);
-		pointOfInterestStorage.flush(chunkPos);
-		protoChunk.setUnsaved(false);
-		versionedChunkStorage.write(chunkPos, ChunkSerializer.write(serverWorld, protoChunk));
+		saveChunk(protoChunk);
 		// TODO: Add a (Neo)Forge ChunkDataEvent.Save invoker
 		// Also add a Fabric/Architectury chunk save event invoker
 		// and run `serverLevel.getProfiler().incrementCounter("chunkSave");` on the chunk save event

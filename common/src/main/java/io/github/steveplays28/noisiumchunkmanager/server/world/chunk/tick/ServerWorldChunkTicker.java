@@ -54,17 +54,19 @@ public class ServerWorldChunkTicker {
 
 	@SuppressWarnings("ForLoopReplaceableByForEach")
 	private void tick() {
+		@NotNull var isRandomTickingEnabled = serverWorld.getGameRules().getInt(GameRules.RULE_RANDOMTICKING);
 		for (int loadedChunkPositionIndex = 0; loadedChunkPositionIndex < loadedChunkPositions.size(); loadedChunkPositionIndex++) {
+			if (serverWorld.getServer().getNextTickTime() <= System.nanoTime()) {
+				break;
+			}
+
 			@Nullable var loadedChunkPosition = loadedChunkPositions.get(loadedChunkPositionIndex);
 			if (loadedChunkPosition == null) {
 				continue;
 			}
 
 			// TODO: Re-use ChunkPos via a new getChunk(ChunkPos) method in ServerWorldExtension
-			serverWorld.tickChunk(
-					serverWorld.getChunk(loadedChunkPosition.x, loadedChunkPosition.z),
-					serverWorld.getGameRules().getInt(GameRules.RULE_RANDOMTICKING)
-			);
+			serverWorld.tickChunk(serverWorld.getChunk(loadedChunkPosition.x, loadedChunkPosition.z), isRandomTickingEnabled);
 		}
 	}
 }

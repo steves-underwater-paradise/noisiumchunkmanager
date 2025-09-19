@@ -34,20 +34,15 @@ public class ServerWorldPlayerChunkLoader {
 	private final @NotNull Executor threadPoolExecutor;
 	private final @NotNull Map<Integer, Vec3> previousPlayerPositions;
 
-	public ServerWorldPlayerChunkLoader(
-			@NotNull ServerLevel serverWorld,
-			@NotNull BiFunction<ChunkPos, Integer, Map<ChunkPos, CompletableFuture<LevelChunk>>> worldChunksInRadiusLoadFunction,
-			@NotNull Function<ChunkPos, CompletableFuture<LevelChunk>> worldChunkLoadFunction,
-			@NotNull Consumer<ChunkPos> worldChunkUnloadConsumer,
-			@NotNull Supplier<Integer> serverViewDistanceSupplier
-	) {
+	public ServerWorldPlayerChunkLoader(@NotNull ServerLevel serverWorld, @NotNull BiFunction<ChunkPos, Integer, Map<ChunkPos, CompletableFuture<LevelChunk>>> worldChunksInRadiusLoadFunction,
+			@NotNull Function<ChunkPos, CompletableFuture<LevelChunk>> worldChunkLoadFunction, @NotNull Consumer<ChunkPos> worldChunkUnloadConsumer,
+			@NotNull Supplier<Integer> serverViewDistanceSupplier) {
 		this.serverWorld = serverWorld;
 		this.worldChunkLoadFunction = worldChunkLoadFunction;
 		this.worldChunkUnloadConsumer = worldChunkUnloadConsumer;
 		this.serverViewDistanceSupplier = serverViewDistanceSupplier;
 
-		this.threadPoolExecutor = Executors.newFixedThreadPool(
-				1, new ThreadFactoryBuilder().setNameFormat("Noisium Server Player Chunk Loader %d").build());
+		this.threadPoolExecutor = Executors.newFixedThreadPool(1, new ThreadFactoryBuilder().setNameFormat("Noisium Server Player Chunk Loader %d").build());
 		this.previousPlayerPositions = new HashMap<>();
 
 		PlayerEvent.PLAYER_JOIN.register(player -> {
@@ -57,17 +52,13 @@ public class ServerWorldPlayerChunkLoader {
 
 			@NotNull var playerBlockPosition = player.blockPosition();
 			// Send new render distance center to the player asynchronously
-			CompletableFuture.runAsync(() -> player.connection.send(
-					new ClientboundSetChunkCacheCenterPacket(
-							SectionPos.blockToSectionCoord(playerBlockPosition.getX()),
-							SectionPos.blockToSectionCoord(playerBlockPosition.getZ())
-					)), threadPoolExecutor);
+			CompletableFuture.runAsync(
+					() -> player.connection
+							.send(new ClientboundSetChunkCacheCenterPacket(SectionPos.blockToSectionCoord(playerBlockPosition.getX()), SectionPos.blockToSectionCoord(playerBlockPosition.getZ()))),
+					threadPoolExecutor);
 			// Send chunks around the player to the player asynchronously
-			ChunkUtil.sendWorldChunksToPlayerAsync(
-					serverWorld,
-					new ArrayList<>(worldChunksInRadiusLoadFunction.apply(player.chunkPosition(), serverViewDistanceSupplier.get()).values()),
-					threadPoolExecutor
-			);
+			ChunkUtil.sendWorldChunksToPlayerAsync(serverWorld, new ArrayList<>(worldChunksInRadiusLoadFunction.apply(player.chunkPosition(), serverViewDistanceSupplier.get()).values()),
+					threadPoolExecutor);
 			previousPlayerPositions.put(player.getId(), player.position());
 		});
 		PlayerEvent.PLAYER_QUIT.register(player -> previousPlayerPositions.remove(player.getId()));
@@ -88,6 +79,7 @@ public class ServerWorldPlayerChunkLoader {
 			return;
 		}
 
+		// TODO: Run asynchronously
 		for (int i = 0; i < players.size(); i++) {
 			@NotNull var player = players.get(i);
 			@NotNull var playerBlockPos = player.blockPosition();
@@ -98,35 +90,24 @@ public class ServerWorldPlayerChunkLoader {
 
 			// Send world chunks that should be loaded to the player asynchronously
 			@NotNull var previousPlayerChunkPositionsInServerViewDistance = ChunkUtil.getChunkPositionsAtPositionInRadius(
-					new ChunkPos(
-							new BlockPos(
-									Math.round((float) previousPlayerPos.x()),
-									Math.round((float) previousPlayerPos.y()),
-									Math.round((float) previousPlayerPos.z())
-							)
-					), serverViewDistanceSupplier.get()
-			);
-			@NotNull var playerChunkPositionsInServerViewDistance = ChunkUtil.getChunkPositionsAtPositionInRadius(
-					player.chunkPosition(), serverViewDistanceSupplier.get());
-			@NotNull final var chunkPositionsToLoad = ChunkUtil.getChunkPositionDifferences(
-					playerChunkPositionsInServerViewDistance, previousPlayerChunkPositionsInServerViewDistance);
+					new ChunkPos(new BlockPos(Math.round((float) previousPlayerPos.x()), Math.round((float) previousPlayerPos.y()), Math.round((float) previousPlayerPos.z()))),
+					serverViewDistanceSupplier.get());
+			@NotNull var playerChunkPositionsInServerViewDistance = ChunkUtil.getChunkPositionsAtPositionInRadius(player.chunkPosition(), serverViewDistanceSupplier.get());
+			@NotNull final var chunkPositionsToLoad = ChunkUtil.getChunkPositionDifferences(playerChunkPositionsInServerViewDistance, previousPlayerChunkPositionsInServerViewDistance);
 			for (int chunkPositionsToLoadIndex = 0; chunkPositionsToLoadIndex < chunkPositionsToLoad.size(); chunkPositionsToLoadIndex++) {
-				ChunkUtil.sendWorldChunkToPlayerAsync(
-						serverWorld, worldChunkLoadFunction.apply(chunkPositionsToLoad.get(chunkPositionsToLoadIndex)), threadPoolExecutor);
+				ChunkUtil.sendWorldChunkToPlayerAsync(serverWorld, worldChunkLoadFunction.apply(chunkPositionsToLoad.get(chunkPositionsToLoadIndex)), threadPoolExecutor);
 			}
 
 			// Send new render distance center to the player asynchronously
-			CompletableFuture.runAsync(() -> player.connection.send(
-					new ClientboundSetChunkCacheCenterPacket(
-							SectionPos.blockToSectionCoord(playerBlockPos.getX()),
-							SectionPos.blockToSectionCoord(playerBlockPos.getZ())
-					)), threadPoolExecutor);
+			CompletableFuture.runAsync(
+					() -> player.connection
+							.send(new ClientboundSetChunkCacheCenterPacket(SectionPos.blockToSectionCoord(playerBlockPos.getX()), SectionPos.blockToSectionCoord(playerBlockPos.getZ()))),
+					threadPoolExecutor);
 
 			// Unload world chunks that aren't required anymore asynchronously
 			// TODO: Check if other players are still in range of these chunks
-			//  Unload chunks at the end of the players fori loop instead
-			@NotNull final var chunkPositionsToUnload = ChunkUtil.getChunkPositionDifferences(
-					previousPlayerChunkPositionsInServerViewDistance, playerChunkPositionsInServerViewDistance);
+			// Unload chunks at the end of the players fori loop instead
+			@NotNull final var chunkPositionsToUnload = ChunkUtil.getChunkPositionDifferences(previousPlayerChunkPositionsInServerViewDistance, playerChunkPositionsInServerViewDistance);
 			for (int chunkPositionsToUnloadIndex = 0; chunkPositionsToUnloadIndex < chunkPositionsToUnload.size(); chunkPositionsToUnloadIndex++) {
 				worldChunkUnloadConsumer.accept(chunkPositionsToUnload.get(chunkPositionsToUnloadIndex));
 			}

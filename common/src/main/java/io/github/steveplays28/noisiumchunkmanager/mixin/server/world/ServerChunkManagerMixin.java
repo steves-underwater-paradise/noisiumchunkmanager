@@ -116,6 +116,11 @@ public abstract class ServerChunkManagerMixin {
 		ci.cancel();
 	}
 
+	@Inject(method = "pollTask", at = @At(value = "HEAD"), cancellable = true)
+	private void noisiumchunkmanager$stopServerChunkManagerFromPollingTasks(@NotNull CallbackInfoReturnable<Boolean> cir) {
+		cir.setReturnValue(false);
+	}
+
 	// TODO: Fix infinite loop
 	@Inject(method = "getChunk(IILnet/minecraft/world/level/chunk/ChunkStatus;Z)Lnet/minecraft/world/level/chunk/ChunkAccess;", at = @At(value = "HEAD"), cancellable = true)
 	private void noisiumchunkmanager$getChunkFromNoisiumServerWorldChunkManager(int chunkX, int chunkZ, ChunkStatus leastStatus, boolean create, CallbackInfoReturnable<ChunkAccess> cir) {
