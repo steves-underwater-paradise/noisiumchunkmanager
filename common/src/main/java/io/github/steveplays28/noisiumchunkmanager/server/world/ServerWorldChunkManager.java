@@ -12,7 +12,6 @@ import io.github.steveplays28.noisiumchunkmanager.extension.world.level.chunk.st
 import io.github.steveplays28.noisiumchunkmanager.mixin.accessor.util.collection.PackedIntegerArrayAccessor;
 import io.github.steveplays28.noisiumchunkmanager.mixin.accessor.world.gen.chunk.NoiseChunkGeneratorAccessor;
 import io.github.steveplays28.noisiumchunkmanager.server.event.world.chunk.ServerChunkEvent;
-import io.github.steveplays28.noisiumchunkmanager.util.world.chunk.ChunkUtil;
 import io.github.steveplays28.noisiumchunkmanager.world.chunk.IoWorldChunk;
 import java.nio.file.Path;
 import java.util.*;
@@ -28,7 +27,6 @@ import net.minecraft.util.SimpleBitStorage;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.ai.village.poi.PoiManager;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ChunkGenerator;
@@ -94,7 +92,6 @@ public class ServerWorldChunkManager {
 		this.ioWorldChunks = new ConcurrentHashMap<>();
 		this.loadedWorldChunks = new HashMap<>();
 
-		ServerChunkEvent.LIGHT_UPDATE.register(this::onLightUpdateAsync);
 		TickEvent.SERVER_LEVEL_POST.register(instance -> {
 			if (!instance.equals(serverWorld) || instance.players().isEmpty()) {
 				return;
@@ -342,46 +339,6 @@ public class ServerWorldChunkManager {
 
 	public @NotNull PoiManager getPointOfInterestManager() {
 		return pointOfInterestStorage;
-	}
-
-	// TODO: Move into the ServerLightingProvider
-
-	/**
-	 * Updates the chunk's lighting at the specified {@link SectionPos}. This method is ran asynchronously.
-	 *
-	 * @param lightType The {@link LightLayer} that should be updated for this {@link LevelChunk}.
-	 * @param chunkSectionPosition The {@link SectionPos} of the {@link LevelChunk}.
-	 */
-	private void onLightUpdateAsync(@NotNull LightLayer lightType, @NotNull SectionPos chunkSectionPosition) {
-		CompletableFuture.runAsync(() -> this.onLightUpdate(lightType, chunkSectionPosition), threadPoolExecutor);
-	}
-
-	/**
-	 * Updates the chunk's lighting at the specified {@link SectionPos}. WARNING: This method blocks the server thread. Prefer using
-	 * {@link ServerWorldChunkManager#onLightUpdateAsync(LightLayer, SectionPos)} instead.
-	 *
-	 * @param lightType The {@link LightLayer} that should be updated for this {@link LevelChunk}.
-	 * @param chunkSectionPosition The {@link SectionPos} of the {@link LevelChunk}.
-	 */
-	private void onLightUpdate(@NotNull LightLayer lightType, @NotNull SectionPos chunkSectionPosition) {
-		// NoisiumChunkManager.LOGGER.info("light update at {}", chunkSectionPosition);
-		var chunkSectionYPosition = chunkSectionPosition.y();
-		var lightingProvider = serverWorld.getLightEngine();
-		var bottomY = lightingProvider.getMinLightSection();
-		if (chunkSectionYPosition < bottomY || chunkSectionYPosition > lightingProvider.getMaxLightSection()) {
-			return;
-		}
-
-		@NotNull var chunkPosition = chunkSectionPosition.chunk();
-		@NotNull var skyLightBits = new BitSet();
-		@NotNull var blockLightBits = new BitSet();
-		var chunkSectionYPositionDifference = chunkSectionYPosition - bottomY;
-		if (lightType == LightLayer.SKY) {
-			skyLightBits.set(chunkSectionYPositionDifference);
-		} else {
-			blockLightBits.set(chunkSectionYPositionDifference);
-		}
-		ChunkUtil.sendLightUpdateToPlayers(serverWorld.players(), lightingProvider, chunkPosition, skyLightBits, blockLightBits);
 	}
 
 	private @Nullable CompoundTag getNbtDataAtChunkPosition(ChunkPos chunkPos) {

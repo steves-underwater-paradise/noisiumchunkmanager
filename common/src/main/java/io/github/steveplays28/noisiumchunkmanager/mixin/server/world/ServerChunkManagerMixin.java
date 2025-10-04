@@ -6,7 +6,6 @@ import com.mojang.datafixers.DataFixer;
 import io.github.steveplays28.noisiumchunkmanager.server.extension.world.ServerWorldExtension;
 import io.github.steveplays28.noisiumchunkmanager.server.event.world.ticket.ServerWorldTicketEvent;
 import io.github.steveplays28.noisiumchunkmanager.server.world.ServerWorldChunkManager;
-import io.github.steveplays28.noisiumchunkmanager.server.event.world.chunk.ServerChunkEvent;
 import io.github.steveplays28.noisiumchunkmanager.server.event.world.ServerTickEvent;
 import io.github.steveplays28.noisiumchunkmanager.util.networking.packet.PacketUtil;
 import org.jetbrains.annotations.NotNull;
@@ -22,7 +21,6 @@ import java.util.concurrent.Executor;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.SectionPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
@@ -38,7 +36,6 @@ import net.minecraft.server.level.progress.ChunkProgressListener;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.ChunkGeneratorStructureState;
@@ -219,12 +216,6 @@ public abstract class ServerChunkManagerMixin {
 		// TODO: Implement block entity update packet sending
 		var serverWorld = (ServerLevel) this.getLevel();
 		PacketUtil.sendPacketToPlayers(serverWorld.players(), new ClientboundBlockUpdatePacket(blockPos, serverWorld.getBlockState(blockPos)));
-		ci.cancel();
-	}
-
-	@Inject(method = "onLightUpdate", at = @At(value = "HEAD"), cancellable = true)
-	private void noisiumchunkmanager$updateLightingViaNoisiumServerWorldChunkManager(LightLayer lightType, SectionPos chunkSectionPos, CallbackInfo ci) {
-		ServerChunkEvent.LIGHT_UPDATE.invoker().onLightUpdate(lightType, chunkSectionPos);
 		ci.cancel();
 	}
 

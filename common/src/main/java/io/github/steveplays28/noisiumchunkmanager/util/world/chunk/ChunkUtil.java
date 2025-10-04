@@ -2,7 +2,7 @@ package io.github.steveplays28.noisiumchunkmanager.util.world.chunk;
 
 import io.github.steveplays28.noisiumchunkmanager.NoisiumChunkManager;
 import io.github.steveplays28.noisiumchunkmanager.extension.world.chunk.WorldChunkExtension;
-
+import io.github.steveplays28.noisiumchunkmanager.server.world.ServerLevelLightEngine;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.jetbrains.annotations.NotNull;
 
@@ -33,9 +33,9 @@ public class ChunkUtil {
 	 */
 	public static void sendWorldChunkToPlayer(@NotNull ServerLevel serverLevel, @NotNull LevelChunk worldChunk) {
 		try {
-			var worldChunkExtension = (WorldChunkExtension) worldChunk;
-			var chunkDataS2CPacket = new ClientboundLevelChunkWithLightPacket(worldChunk, serverLevel.getLightEngine(), worldChunkExtension.noisiumchunkmanager$getSkyLightBits(),
-					worldChunkExtension.noisiumchunkmanager$getBlockLightBits());
+			var chunkDataS2CPacket = new ClientboundLevelChunkWithLightPacket(worldChunk, serverLevel.getLightEngine(),
+					((ServerLevelLightEngine) serverLevel.getLightEngine()).getWorldChunkSkyLightBits(worldChunk.getPos()),
+					((ServerLevelLightEngine) serverLevel.getLightEngine()).getWorldChunkBlockLightBits(worldChunk.getPos()));
 			for (int i = 0; i < serverLevel.players().size(); i++) {
 				serverLevel.players().get(i).trackChunk(worldChunk.getPos(), chunkDataS2CPacket);
 			}

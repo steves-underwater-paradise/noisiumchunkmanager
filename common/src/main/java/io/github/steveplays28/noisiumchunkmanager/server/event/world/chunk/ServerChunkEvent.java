@@ -30,7 +30,7 @@ public interface ServerChunkEvent {
 		 * Invoked after a {@link LevelChunk} has been loaded by {@link ServerWorldChunkManager}, either via world generation or from save data.
 		 *
 		 * @param serverWorld The {@link ServerLevel} of the loaded {@link LevelChunk}.
-		 * @param worldChunk  The loaded {@link LevelChunk}.
+		 * @param worldChunk The loaded {@link LevelChunk}.
 		 */
 		void onWorldChunkLoaded(@NotNull ServerLevel serverWorld, @NotNull LevelChunk worldChunk);
 	}
@@ -40,7 +40,7 @@ public interface ServerChunkEvent {
 		/**
 		 * Invoked after a {@link LevelChunk} has been unloaded by {@link ServerWorldChunkManager}.
 		 *
-		 * @param serverWorld        The {@link ServerLevel} of the unloaded {@link LevelChunk}.
+		 * @param serverWorld The {@link ServerLevel} of the unloaded {@link LevelChunk}.
 		 * @param worldChunkPosition The {@link ChunkPos} of the unloaded {@link LevelChunk}.
 		 */
 		void onWorldChunkUnloaded(@NotNull ServerLevel serverWorld, @NotNull ChunkPos worldChunkPosition);
@@ -51,9 +51,9 @@ public interface ServerChunkEvent {
 		/**
 		 * Invoked before a {@link LevelChunk} has had a light update processed by {@link ServerWorldChunkManager}.
 		 *
-		 * @param lightType            The {@link LightLayer} of the {@link LevelChunk}.
+		 * @param lightType The {@link LightLayer} of the {@link LevelChunk}.
 		 * @param chunkSectionPosition The {@link SectionPos} of the {@link LevelChunk}.
 		 */
-		void onLightUpdate(@NotNull LightLayer lightType, @NotNull SectionPos chunkSectionPosition);
+		void onLightUpdate(@NotNull ServerLevel serverLevel, @NotNull LightLayer lightType, @NotNull SectionPos chunkSectionPosition);
 	}
 }

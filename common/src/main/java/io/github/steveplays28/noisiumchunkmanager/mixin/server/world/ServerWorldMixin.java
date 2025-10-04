@@ -134,7 +134,7 @@ public abstract class ServerWorldMixin extends Level implements ServerWorldExten
 
 			@Override
 			public void onLightUpdate(LightLayer lightLayer, SectionPos chunkSectionPosition) {
-				ServerChunkEvent.LIGHT_UPDATE.invoker().onLightUpdate(lightLayer, chunkSectionPosition);
+				ServerChunkEvent.LIGHT_UPDATE.invoker().onLightUpdate(serverWorld, lightLayer, chunkSectionPosition);
 			}
 		}, true, true);
 		noisiumchunkmanager$serverWorldChunkManager =
