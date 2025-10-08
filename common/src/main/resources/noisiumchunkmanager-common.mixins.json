@@ -8,6 +8,7 @@
     "accessor.server.network.PlayerRespawnLogicAccessor",
     "accessor.util.collection.PackedIntegerArrayAccessor",
     "accessor.world.gen.chunk.NoiseChunkGeneratorAccessor",
+    "accessor.ServerEntityAccessor",
     "block.LichenGrowerGrowCheckerMixin",
     "client.gui.WorldGenerationProgressTrackerMixin",
     "compat.distanthorizons.common.wrappers.world.gen.DHBatchGenerationEnvironmentMixin",
@@ -19,7 +20,6 @@
     "server.network.SpawnLocatingMixin",
     "server.world.ServerChunkManagerMixin",
     "server.world.ServerChunkManagerMixin$MainThreadExecutorMixin",
-    "server.world.ServerEntityManagerMixin",
     "server.world.ServerWorldMixin",
     "server.world.ThreadedAnvilChunkStorageMixin",
     "world.ChunkRegionMixin",
@@ -33,9 +33,7 @@
     "world.gen.feature.OreFeatureMixin",
     "world.storage.SectionStorageMixin"
   ],
-  "client": [
-    "client.gui.hud.DebugHudMixin"
-  ],
+  "client": ["client.gui.hud.DebugHudMixin"],
   "injectors": {
     "defaultRequire": 1
   }

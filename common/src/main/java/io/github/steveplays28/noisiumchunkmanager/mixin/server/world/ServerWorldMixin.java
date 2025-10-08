@@ -1,27 +1,35 @@
 package io.github.steveplays28.noisiumchunkmanager.mixin.server.world;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.datafixers.DataFixer;
+import dev.architectury.event.EventResult;
+import dev.architectury.event.events.common.EntityEvent;
 import dev.architectury.event.events.common.LifecycleEvent;
-import dev.architectury.event.events.common.PlayerEvent;
+import io.github.steveplays28.noisiumchunkmanager.NoisiumChunkManager;
 import io.github.steveplays28.noisiumchunkmanager.server.world.ServerLevelLightEngine;
 import io.github.steveplays28.noisiumchunkmanager.server.world.ServerWorldChunkManager;
 import io.github.steveplays28.noisiumchunkmanager.server.world.chunk.tick.ServerWorldChunkTicker;
 import io.github.steveplays28.noisiumchunkmanager.server.world.ticket.ServerWorldTicketTracker;
 import io.github.steveplays28.noisiumchunkmanager.util.networking.packet.PacketUtil;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import net.minecraft.Util;
 import net.minecraft.core.SectionPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.progress.ChunkProgressListener;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.RandomSequences;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.village.poi.PoiManager;
+import net.minecraft.world.entity.boss.EnderDragonPart;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.CustomSpawner;
@@ -31,7 +39,11 @@ import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.LightChunk;
 import net.minecraft.world.level.chunk.LightChunkGetter;
 import net.minecraft.world.level.dimension.LevelStem;
+import net.minecraft.world.level.entity.EntityPersistentStorage;
+import net.minecraft.world.level.entity.EntityTickList;
+import net.minecraft.world.level.entity.LevelEntityGetter;
 import net.minecraft.world.level.entity.PersistentEntitySectionManager;
+import net.minecraft.world.level.gameevent.DynamicGameEventListener;
 import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
 import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 import net.minecraft.world.level.levelgen.RandomState;
@@ -46,20 +58,36 @@ import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import io.github.steveplays28.noisiumchunkmanager.server.extension.world.ServerWorldExtension;
 import io.github.steveplays28.noisiumchunkmanager.server.world.entity.ServerWorldEntityTracker;
 import io.github.steveplays28.noisiumchunkmanager.server.world.entity.player.ServerWorldPlayerChunkLoader;
 import io.github.steveplays28.noisiumchunkmanager.server.event.world.chunk.ServerChunkEvent;
-
+import io.github.steveplays28.noisiumchunkmanager.server.event.world.entity.ServerEntityEvent;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 @Debug(export = true)
 @Mixin(ServerLevel.class)
 public abstract class ServerWorldMixin extends Level implements ServerWorldExtension {
-	@Shadow @Final private PersistentEntitySectionManager<Entity> entityManager;
+	@Shadow @Final @Mutable private @Nullable PersistentEntitySectionManager<Entity> entityManager;
+	@Shadow @Final @NotNull List<ServerPlayer> players;
+	@Shadow @Final @NotNull EntityTickList entityTickList;
+	@Shadow @Final @NotNull Set<Mob> navigatingMobs;
+	@Shadow volatile boolean isUpdatingNavigations;
+	@Shadow @Final @NotNull Int2ObjectMap<EnderDragonPart> dragonParts;
+
+	@Shadow
+	public abstract @NotNull MinecraftServer getServer();
+
+	@Shadow
+	public abstract @NotNull List<ServerPlayer> players();
 
 	@Shadow
 	public abstract boolean areEntitiesLoaded(long chunkPos);
@@ -68,10 +96,7 @@ public abstract class ServerWorldMixin extends Level implements ServerWorldExten
 	public abstract void tickNonPassenger(Entity entity);
 
 	@Shadow
-	public abstract @NotNull MinecraftServer getServer();
-
-	@Shadow
-	public abstract @NotNull List<ServerPlayer> players();
+	public abstract void updateSleepingPlayerList();
 
 	@Unique private RandomState noisiumchunkmanager$noiseConfig;
 	@Unique private LevelLightEngine noisiumchunkmanager$lightEngine;
@@ -102,10 +127,27 @@ public abstract class ServerWorldMixin extends Level implements ServerWorldExten
 		super(serverLevelData, resourceKey, minecraftServer.registryAccess(), levelStem.type(), minecraftServer::getProfiler, false, bl, l, minecraftServer.getMaxChainedNeighborUpdates());
 	}
 
-	@Inject(method = "<init>", at = @At(value = "INVOKE_ASSIGN", target = "Lnet/minecraft/server/MinecraftServer;getFixerUpper()Lcom/mojang/datafixers/DataFixer;", shift = At.Shift.AFTER))
+	@WrapOperation(method = "<init>",
+			at = @At(value = "FIELD", opcode = Opcodes.PUTFIELD, target = "Lnet/minecraft/server/level/ServerLevel;entityManager:Lnet/minecraft/world/level/entity/PersistentEntitySectionManager;"))
+	private void noisiumchunkmanager$preventCreatingPersistentEntitySectionManager(ServerLevel instance, PersistentEntitySectionManager<?> newValue, Operation<Void> original,
+			MinecraftServer minecraftServer, Executor executor, LevelStorageSource.LevelStorageAccess levelStorageAccess, ServerLevelData serverLevelData, ResourceKey<Level> resourceKey,
+			LevelStem levelStem, ChunkProgressListener chunkProgressListener, boolean bl, long l, List<CustomSpawner> list, boolean bl2, @Nullable RandomSequences randomSequences) {
+		return;
+	}
+
+	@WrapOperation(method = "<init>", at = @At(value = "INVOKE", target = "Ljava/util/Objects;requireNonNull(Ljava/lang/Object;)Ljava/lang/Object;", ordinal = 1))
+	private Object noisiumchunkmanager$preventPersistentEntitySectionManagerNonNullCheck(Object value, Operation<PersistentEntitySectionManager<?>> original) {
+		return null;
+	}
+
+	// TODO: Reimplement ServerLevel#EntityCallbacks
+	@Inject(method = "<init>", at = @At(value = "INVOKE",
+			target = "Lnet/minecraft/world/level/chunk/storage/EntityStorage;<init>(Lnet/minecraft/server/level/ServerLevel;Ljava/nio/file/Path;Lcom/mojang/datafixers/DataFixer;ZLjava/util/concurrent/Executor;)V",
+			shift = At.Shift.BY, by = 3))
 	private void noisiumchunkmanager$constructorCreateServerWorldChunkManager(@NotNull MinecraftServer server, Executor workerExecutor, @NotNull LevelStorageSource.LevelStorageAccess session,
 			@NotNull ServerLevelData serverWorldProperties, @NotNull ResourceKey<Level> worldKey, @NotNull LevelStem dimensionOptions, ChunkProgressListener worldGenerationProgressListener,
-			boolean debugWorld, long seed, List<?> spawners, boolean shouldTickTime, RandomSequences randomSequencesState, @NotNull CallbackInfo ci, @Local @NotNull DataFixer dataFixer) {
+			boolean debugWorld, long seed, List<?> spawners, boolean shouldTickTime, RandomSequences randomSequencesState, @NotNull CallbackInfo ci, @Local @NotNull DataFixer dataFixer,
+			@Local @NotNull EntityPersistentStorage<Entity> entityPersistentStorage) {
 		@SuppressWarnings("DataFlowIssue") var serverWorld = ((ServerLevel) (Object) this);
 		@NotNull ChunkGenerator chunkGenerator = dimensionOptions.generator();
 		@NotNull NoiseGeneratorSettings chunkGeneratorSettings;
@@ -142,29 +184,69 @@ public abstract class ServerWorldMixin extends Level implements ServerWorldExten
 		noisiumchunkmanager$serverWorldTicketTracker =
 				new ServerWorldTicketTracker(serverWorld, noisiumchunkmanager$serverWorldChunkManager::getChunksInRadiusAsync, noisiumchunkmanager$serverWorldChunkManager::unloadChunk);
 		noisiumchunkmanager$serverWorldChunkTicker = new ServerWorldChunkTicker(serverWorld);
-		noisiumchunkmanager$serverWorldEntityManager = new ServerWorldEntityTracker(packet -> PacketUtil.sendPacketToPlayers(serverWorld.players(), packet));
+		noisiumchunkmanager$serverWorldEntityManager = new ServerWorldEntityTracker(serverWorld, entityPersistentStorage, packet -> PacketUtil.sendPacketToPlayers(serverWorld.players(), packet));
 		noisiumchunkmanager$serverWorldPlayerChunkLoader = new ServerWorldPlayerChunkLoader(serverWorld, noisiumchunkmanager$serverWorldChunkManager::getChunksInRadiusAsync,
 				noisiumchunkmanager$serverWorldChunkManager::getChunkAsync, noisiumchunkmanager$serverWorldChunkManager::unloadChunk, server.getPlayerList()::getViewDistance);
 
-		// TODO: Redo the server entity manager entirely, in an event-based way
-		// Also remove this line when that's done, since this doesn't belong here
-		PlayerEvent.PLAYER_JOIN.register(player -> {
-			if (!player.level().equals(serverWorld)) {
-				return;
+		// TODO: Reimplement ServerLevel.EntityCallbacks#onSectionChange
+		ServerEntityEvent.AFTER_ADDED.register((ServerLevel serverLevel, Entity entity) -> {
+			if (!serverWorld.equals(serverLevel)) {
+				return EventResult.pass();
 			}
 
-			this.entityManager.addNewEntity(player);
+			if (entity instanceof ServerPlayer serverPlayer) {
+				this.players.add(serverPlayer);
+				this.updateSleepingPlayerList();
+			}
+
+			if (entity instanceof Mob mob) {
+				if (this.isUpdatingNavigations) {
+					@NotNull String message = "onTrackingStart called during navigation iteration";
+					Util.logAndPauseIfInIde(message, new IllegalStateException(message));
+				}
+
+				this.navigatingMobs.add(mob);
+			}
+
+			if (entity instanceof EnderDragon enderDragon) {
+				for (EnderDragonPart enderDragonPart : enderDragon.getSubEntities()) {
+					this.dragonParts.put(enderDragonPart.getId(), enderDragonPart);
+				}
+			}
+
+			entity.updateDynamicGameEventListener(DynamicGameEventListener::add);
+			this.entityTickList.add(entity);
+			return EventResult.pass();
 		});
-
-		// TODO: Move this event listener registration to ServerEntityManagerMixin
-		// or (when it's finished and able to completely replace the vanilla class) to NoisiumServerWorldEntityTracker
-		// More efficient methods can be used when registering the event listener directly in the server entity manager
-		ServerChunkEvent.WORLD_CHUNK_LOADED.register((instance, worldChunk) -> {
-			if (instance != serverWorld) {
-				return;
+		ServerEntityEvent.AFTER_REMOVED.register((ServerLevel serverLevel, Entity entity) -> {
+			if (!serverWorld.equals(serverLevel)) {
+				return EventResult.pass();
 			}
 
-			server.executeIfPossible(() -> this.entityManager.updateChunkStatus(worldChunk.getPos(), FullChunkStatus.ENTITY_TICKING));
+			if (entity instanceof ServerPlayer serverPlayer) {
+				this.players.remove(serverPlayer);
+				this.updateSleepingPlayerList();
+			}
+
+			if (entity instanceof Mob mob) {
+				if (this.isUpdatingNavigations) {
+					@NotNull String message = "onTrackingEnd called during navigation iteration";
+					Util.logAndPauseIfInIde(message, new IllegalStateException(message));
+				}
+
+				this.navigatingMobs.remove(mob);
+			}
+
+			if (entity instanceof EnderDragon enderDragon) {
+				for (EnderDragonPart enderDragonPart : enderDragon.getSubEntities()) {
+					this.dragonParts.remove(enderDragonPart.getId());
+				}
+			}
+
+			entity.updateDynamicGameEventListener(DynamicGameEventListener::remove);
+			this.entityTickList.remove(entity);
+			this.getScoreboard().entityRemoved(entity);
+			return EventResult.pass();
 		});
 		LifecycleEvent.SERVER_STOPPED.register(instance -> {
 			noisiumchunkmanager$serverWorldPlayerChunkLoader = null;
@@ -192,24 +274,14 @@ public abstract class ServerWorldMixin extends Level implements ServerWorldExten
 		return noisiumchunkmanager$lightEngine;
 	}
 
-	// @Inject(method = "getLightEngine", at = @At(value = "HEAD"), cancellable = true)
-	// private void noisiumchunkmanager$getLightEngineFromServerChunkManager(@NotNull CallbackInfoReturnable<LevelLightEngine> cir) {
-	// cir.setReturnValue(noisiumchunkmanager$lightEngine);
-	// }
-
 	@Inject(method = "isPositionTickingWithEntitiesLoaded", at = @At(value = "HEAD"), cancellable = true)
 	private void noisiumchunkmanager$checkIfTickingFutureIsReadyByCheckingIfTheChunkIsLoaded(long chunkPos, @NotNull CallbackInfoReturnable<Boolean> cir) {
-		cir.setReturnValue(this.areEntitiesLoaded(chunkPos));
+		cir.setReturnValue(true);
 	}
 
 	@Inject(method = {"lambda$tick$6(Lnet/minecraft/util/profiling/ProfilerFiller;Lnet/minecraft/world/entity/Entity;)V", "a", "method_31420"},
 			at = @At(value = "FIELD", target = "Lnet/minecraft/server/level/ServerChunkCache;chunkMap:Lnet/minecraft/server/level/ChunkMap;", opcode = Opcodes.GETFIELD), cancellable = true)
 	private void noisiumchunkmanager$redirectShouldTickEntities(@NotNull ProfilerFiller profiler, @NotNull Entity entity, @NotNull CallbackInfo ci) {
-		if (!this.entityManager.canPositionTick(entity.chunkPosition())) {
-			ci.cancel();
-			return;
-		}
-
 		var vehicleEntity = entity.getVehicle();
 		if (vehicleEntity != null) {
 			if (!vehicleEntity.isRemoved() && vehicleEntity.hasPassenger(entity)) {
@@ -224,6 +296,49 @@ public abstract class ServerWorldMixin extends Level implements ServerWorldExten
 		this.tickNonPassenger(entity);
 		profiler.pop();
 		ci.cancel();
+	}
+
+	@WrapOperation(method = "Lnet/minecraft/server/level/ServerLevel;tick(Ljava/util/function/BooleanSupplier;)V",
+			at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/entity/PersistentEntitySectionManager;tick()V"))
+	private void noisiumchunkmanager$redirectPersistentEntitySectionManagerTickToServerLevelEntityTracker(@Nullable PersistentEntitySectionManager<Entity> instance, Operation<Void> original) {
+		// TODO: Invoke a server level entity tracker tick event
+	}
+
+	@Inject(method = "getEntities()Lnet/minecraft/world/level/entity/LevelEntityGetter;", at = @At(value = "HEAD"), cancellable = true)
+	protected void noisiumchunkmanager$getEntitiesFromServerLevelEntityTracker(@NotNull CallbackInfoReturnable<LevelEntityGetter<Entity>> cir) {
+		cir.setReturnValue(this.noisiumchunkmanager$serverWorldEntityManager.getEntities());
+	}
+
+	@Inject(method = "addPlayer", at = @At(value = "HEAD"), cancellable = true)
+	private void noisiumchunkmanager$cancelAddPlayer(@NotNull CallbackInfo ci) {
+		ci.cancel();
+	}
+
+	@Inject(method = "addEntity", at = @At(value = "HEAD"), cancellable = true, order = 0)
+	private void noisiumchunkmanager$cancelAddEntity(Entity entity, @NotNull CallbackInfoReturnable<Boolean> cir) {
+		cir.setReturnValue(EntityEvent.ADD.invoker().add(entity, (ServerLevel) (Object) this).isFalse());
+	}
+
+	@ModifyArg(method = "tryAddFreshEntityWithPassengers", at = @At(value = "INVOKE", target = "Ljava/util/stream/Stream;anyMatch(Ljava/util/function/Predicate;)Z"))
+	private @NotNull Predicate<UUID> noisiumchunkmanager$redirectPersistentEntitySectionManagerIsEntityLoadedToServerLevelEntityTracker(@Nullable Predicate<UUID> original) {
+		NoisiumChunkManager.LOGGER.info("tryAddFreshEntityWithPassengers");
+		return (UUID uuid) -> noisiumchunkmanager$serverWorldEntityManager.getEntities().get(uuid) != null;
+	}
+
+	@WrapOperation(method = "tryAddFreshEntityWithPassengers", at = @At(value = "INVOKE", target = "Ljava/util/Objects;requireNonNull(Ljava/lang/Object;)Ljava/lang/Object;"))
+	private Object noisiumchunkmanager$tryAddFreshEntityWithPassengersPreventPersistentEntitySectionManagerNonNullCheck(Object value, Operation<PersistentEntitySectionManager<?>> original) {
+		return null;
+	}
+
+	@WrapOperation(method = "close", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/entity/PersistentEntitySectionManager;close()V"))
+	private void noisiumchunkmanager$cancelPersistentEntitySectionManagerClose(@Nullable PersistentEntitySectionManager<Entity> instance, Operation<Void> original) {
+		// NO-OP
+	}
+
+	@WrapOperation(method = "gatherChunkSourceStats", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/entity/PersistentEntitySectionManager;gatherStats()Ljava/lang/String;"))
+	private @NotNull String noisiumchunkmanager$gatherStatisticsFromServerLevelEntityTracker(@Nullable PersistentEntitySectionManager<Entity> instance, Operation<String> original) {
+		// TODO
+		return String.format("%s/%s", "TODO", "TODO");
 	}
 
 	@Override

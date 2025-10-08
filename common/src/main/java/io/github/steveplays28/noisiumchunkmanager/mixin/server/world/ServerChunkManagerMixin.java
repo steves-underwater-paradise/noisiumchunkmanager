@@ -52,6 +52,7 @@ import net.minecraft.world.level.storage.LevelStorageSource;
  * {@link Mixin} into {@link ServerChunkCache}. This {@link Mixin} redirects all method calls from the {@link ServerLevel}'s {@link ServerChunkCache} to the {@link ServerLevel}'s
  * {@link ServerWorldChunkManager}.
  */
+@Debug(export = true)
 @Mixin(ServerChunkCache.class)
 public abstract class ServerChunkManagerMixin {
 	@Mutable @Shadow @Final public @Nullable ChunkMap chunkMap;

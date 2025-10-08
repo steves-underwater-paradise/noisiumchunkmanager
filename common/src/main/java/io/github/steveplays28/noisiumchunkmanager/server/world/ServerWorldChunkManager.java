@@ -52,7 +52,6 @@ import org.jetbrains.annotations.Nullable;
  * A chunk manager for {@link ServerLevel}s. This class cannot extend {@link net.minecraft.server.level.ServerChunkCache} or {@link ChunkSource} due to {@link ServerLevel}s requiring an implementation
  * of {@link net.minecraft.server.level.ServerChunkCache}, which would slow the chunk manager down.
  */
-// The check needs to be changed to point to the server world's isChunkLoaded() method
 // TODO: Save all chunks when save event is called
 public class ServerWorldChunkManager {
 	private final ServerLevel serverWorld;

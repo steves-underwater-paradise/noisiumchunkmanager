@@ -71,7 +71,6 @@ public class ServerWorldPlayerChunkLoader {
 		});
 	}
 
-	// TODO: Enable ticking/update chunk tracking in ServerEntityManager
 	@SuppressWarnings("ForLoopReplaceableByForEach")
 	private void tick() {
 		@NotNull var players = serverWorld.players();
