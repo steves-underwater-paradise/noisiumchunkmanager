@@ -52,9 +52,7 @@ import org.jetbrains.annotations.Nullable;
  * A chunk manager for {@link ServerLevel}s. This class cannot extend {@link net.minecraft.server.level.ServerChunkCache} or {@link ChunkSource} due to {@link ServerLevel}s requiring an implementation
  * of {@link net.minecraft.server.level.ServerChunkCache}, which would slow the chunk manager down.
  */
-// TODO: Fix canTickBlockEntities() check
 // The check needs to be changed to point to the server world's isChunkLoaded() method
-// TODO: Implement chunk ticking
 // TODO: Save all chunks when save event is called
 public class ServerWorldChunkManager {
 	private final ServerLevel serverWorld;
@@ -170,6 +168,7 @@ public class ServerWorldChunkManager {
 			loadingWorldChunks.remove(chunkPos);
 			if (!unloadingWorldChunks.contains(chunkPos)) {
 				loadedWorldChunks.put(chunkPos, fetchedWorldChunk);
+				fetchedWorldChunk.setLoaded(true);
 			}
 			// TODO: Run `serverLevel.getProfiler().incrementCounter("chunkLoad");` on the ServerChunkEvent.WORLD_CHUNK_LOADED event
 			syncRunnableConsumer.accept(() -> ServerChunkEvent.WORLD_CHUNK_LOADED.invoker().onWorldChunkLoaded(serverWorld, fetchedWorldChunk));

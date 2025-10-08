@@ -211,7 +211,6 @@ public class ServerLevelLightEngine extends LevelLightEngine {
 			}
 
 			@NotNull var chunkPosition = chunkSectionPosition.chunk();
-			NoisiumChunkManager.LOGGER.info("Light update at {}", chunkPosition);
 			var chunkSectionYPositionDifference = chunkSectionYPosition - bottomY;
 			if (lightType == LightLayer.SKY) {
 				worldChunkSkyLightData.compute(chunkPosition, (@NotNull ChunkPos chunkPosition1, @Nullable BitSet skyLightBits) -> {
