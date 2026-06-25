@@ -71,3 +71,5 @@ Client-side and server-side.
 
 This project is licensed under LGPLv3,
 see [LICENSE](https://github.com/steves-underwater-paradise/noisiumchunkmanager/1.20-1.20.1/main/LICENSE).
+
+Copyright (c) 2023-2026 Steveplays
